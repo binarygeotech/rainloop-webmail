@@ -193,17 +193,23 @@ class Service
 
 			$sResult .= '<!--';
 			$sResult .= ' [version:'.APP_VERSION;
+
+			if ($this->oActions->IsOpen())
+			{
+				$sResult .= '][AGPLv3';
+			}
+
 			$sResult .= '][time:'.\substr(\microtime(true) - APP_START, 0, 6);
 			$sResult .= '][cached:'.($bCached ? 'true' : 'false');
-			$sResult .= '][hash:'.$aTemplateParameters['{{BaseHash}}'];
-			$sResult .= '][session:'.\md5(\RainLoop\Utils::GetShortToken());
+//			$sResult .= '][hash:'.$aTemplateParameters['{{BaseHash}}'];
+//			$sResult .= '][session:'.\md5(\RainLoop\Utils::GetShortToken());
 
 			if (\RainLoop\Utils::IsOwnCloud())
 			{
 				$sResult .= '][owncloud:true';
 			}
 
-			$sResult .= '] -->';
+			$sResult .= '] //-->';
 		}
 
 		// Output result
@@ -215,22 +221,16 @@ class Service
 	}
 
 	/**
-	 * @param bool $bAdmin
+	 * @param bool $bAdmin = false
 	 *
 	 * @return array
 	 */
-	private function indexTemplateParameters($bAdmin)
+	private function indexTemplateParameters($bAdmin = false)
 	{
 		$sLanguage = 'en';
 		$sTheme = 'Default';
 
-		if (!$bAdmin)
-		{
-			list($sLanguage, $sTheme) = $this->oActions->GetLanguageAndTheme();
-		}
-
-		$sLanguage = $this->oActions->ValidateLanguage($sLanguage);
-		$sTheme = $this->oActions->ValidateTheme($sTheme);
+		list($sLanguage, $sTheme) = $this->oActions->GetLanguageAndTheme($bAdmin);
 
 		$bAppJsDebug = !!$this->oActions->Config()->Get('labs', 'use_app_debug_js', false);
 		$bAppCssDebug = !!$this->oActions->Config()->Get('labs', 'use_app_debug_css', false);
@@ -271,6 +271,7 @@ class Service
 
 		$aTemplateParameters['{{BaseHash}}'] = \md5(
 			\implode('~', array(
+				$bAdmin ? '1' : '0',
 				\md5($this->oActions->Config()->Get('cache', 'index', '')),
 				$this->oActions->Plugins()->Hash(),
 				\RainLoop\Utils::WebVersionPath(), APP_VERSION

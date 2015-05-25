@@ -4,6 +4,7 @@
 	'use strict';
 
 	var
+		window = require('window'),
 		_ = require('_'),
 		$ = require('$'),
 		ko = require('ko'),
@@ -22,6 +23,7 @@
 
 		Cache = require('Common/Cache'),
 
+		AppStore = require('Stores/User/App'),
 		QuotaStore = require('Stores/User/Quota'),
 		SettingsStore = require('Stores/User/Settings'),
 		FolderStore = require('Stores/User/Folder'),
@@ -46,18 +48,26 @@
 		this.bPrefetch = false;
 		this.emptySubjectValue = '';
 
-		this.hideDangerousActions = !!Settings.settingsGet('HideDangerousActions');
+		this.allowReload = !!Settings.capa(Enums.Capa.Reload);
+		this.allowSearch = !!Settings.capa(Enums.Capa.Search);
+		this.allowSearchAdv = !!Settings.capa(Enums.Capa.SearchAdv);
+		this.allowComposer = !!Settings.capa(Enums.Capa.Composer);
+		this.allowMessageListActions = !!Settings.capa(Enums.Capa.MessageListActions);
+		this.allowDangerousActions = !!Settings.capa(Enums.Capa.DangerousActions);
 
 		this.popupVisibility = Globals.popupVisibility;
 
 		this.message = MessageStore.message;
 		this.messageList = MessageStore.messageList;
 		this.messageListDisableAutoSelect = MessageStore.messageListDisableAutoSelect;
+
 		this.folderList = FolderStore.folderList;
+
 		this.selectorMessageSelected = MessageStore.selectorMessageSelected;
 		this.selectorMessageFocused = MessageStore.selectorMessageFocused;
 		this.isMessageSelected = MessageStore.isMessageSelected;
 		this.messageListSearch = MessageStore.messageListSearch;
+		this.messageListThreadUid = MessageStore.messageListThreadUid;
 		this.messageListError = MessageStore.messageListError;
 		this.folderMenuForMove = FolderStore.folderMenuForMove;
 
@@ -65,11 +75,13 @@
 
 		this.mainMessageListSearch = MessageStore.mainMessageListSearch;
 		this.messageListEndFolder = MessageStore.messageListEndFolder;
+		this.messageListEndThreadUid = MessageStore.messageListEndThreadUid;
 
 		this.messageListChecked = MessageStore.messageListChecked;
 		this.messageListCheckedOrSelected = MessageStore.messageListCheckedOrSelected;
 		this.messageListCheckedOrSelectedUidsWithSubMails = MessageStore.messageListCheckedOrSelectedUidsWithSubMails;
 		this.messageListCompleteLoadingThrottle = MessageStore.messageListCompleteLoadingThrottle;
+		this.messageListCompleteLoadingThrottleForAnimation = MessageStore.messageListCompleteLoadingThrottleForAnimation;
 
 		Translator.initOnStartOrLangChange(function () {
 			this.emptySubjectValue = Translator.i18n('MESSAGE_LIST/EMPTY_SUBJECT_TEXT');
@@ -174,21 +186,46 @@
 			return Consts.Values.UnuseOptionValue === FolderStore.archiveFolder();
 		}, this);
 
+		this.isArchiveVisible = ko.computed(function () {
+			return !this.isArchiveFolder() && !this.isArchiveDisabled() && !this.isDraftFolder();
+		}, this);
+
+		this.isSpamVisible = ko.computed(function () {
+			return !this.isSpamFolder() && !this.isSpamDisabled() && !this.isDraftFolder() && !this.isSentFolder();
+		}, this);
+
+		this.isUnSpamVisible = ko.computed(function () {
+			return this.isSpamFolder() && !this.isSpamDisabled() && !this.isDraftFolder() && !this.isSentFolder();
+		}, this);
+
+		this.messageListFocused = ko.computed(function () {
+			return Enums.Focused.MessageList === AppStore.focusedState();
+		});
+
 		this.canBeMoved = this.hasCheckedOrSelectedLines;
 
 		this.clearCommand = Utils.createCommand(this, function () {
-			kn.showScreenPopup(require('View/Popup/FolderClear'), [FolderStore.currentFolder()]);
+			if (Settings.capa(Enums.Capa.DangerousActions))
+			{
+				kn.showScreenPopup(require('View/Popup/FolderClear'), [FolderStore.currentFolder()]);
+			}
 		});
 
 		this.multyForwardCommand = Utils.createCommand(this, function () {
-			kn.showScreenPopup(require('View/Popup/Compose'), [
-				Enums.ComposeType.ForwardAsAttachment, MessageStore.messageListCheckedOrSelected()]);
+			if (Settings.capa(Enums.Capa.Composer))
+			{
+				kn.showScreenPopup(require('View/Popup/Compose'), [
+					Enums.ComposeType.ForwardAsAttachment, MessageStore.messageListCheckedOrSelected()]);
+			}
 		}, this.canBeMoved);
 
 		this.deleteWithoutMoveCommand = Utils.createCommand(this, function () {
-			require('App/User').deleteMessagesFromFolder(Enums.FolderType.Trash,
-				FolderStore.currentFolderFullNameRaw(),
-				MessageStore.messageListCheckedOrSelectedUidsWithSubMails(), false);
+			if (Settings.capa(Enums.Capa.DangerousActions))
+			{
+				require('App/User').deleteMessagesFromFolder(Enums.FolderType.Trash,
+					FolderStore.currentFolderFullNameRaw(),
+					MessageStore.messageListCheckedOrSelectedUidsWithSubMails(), false);
+			}
 		}, this.canBeMoved);
 
 		this.deleteCommand = Utils.createCommand(this, function () {
@@ -218,7 +255,7 @@
 		this.moveCommand = Utils.createCommand(this, Utils.emptyFunction, this.canBeMoved);
 
 		this.reloadCommand = Utils.createCommand(this, function () {
-			if (!MessageStore.messageListCompleteLoadingThrottle())
+			if (!MessageStore.messageListCompleteLoadingThrottleForAnimation() && this.allowReload)
 			{
 				require('App/User').reloadMessageList(false, true);
 			}
@@ -242,12 +279,16 @@
 			return this.useAutoSelect();
 		}, this));
 
+		this.selector.on('onUpUpOrDownDown', _.bind(function (bV) {
+			this.goToUpUpOrDownDown(bV);
+		}, this));
+
 		Events
-			.sub('mailbox.message-list.selector.go-down', function () {
-				this.selector.goDown(true);
+			.sub('mailbox.message-list.selector.go-down', function (bSelect) {
+				this.selector.goDown(bSelect);
 			}, this)
-			.sub('mailbox.message-list.selector.go-up', function () {
-				this.selector.goUp(true);
+			.sub('mailbox.message-list.selector.go-up', function (bSelect) {
+				this.selector.goUp(bSelect);
 			}, this)
 		;
 
@@ -265,6 +306,72 @@
 	 * @type {string}
 	 */
 	MessageListMailBoxUserView.prototype.emptySubjectValue = '';
+
+	MessageListMailBoxUserView.prototype.iGoToUpUpOrDownDownTimeout = 0;
+
+	MessageListMailBoxUserView.prototype.goToUpUpOrDownDown = function (bUp)
+	{
+		var self = this;
+
+		if (0 < this.messageListChecked().length)
+		{
+			return false;
+		}
+
+		window.clearTimeout(this.iGoToUpUpOrDownDownTimeout);
+		this.iGoToUpUpOrDownDownTimeout = window.setTimeout(function () {
+
+			var
+				oPrev = null,
+				oNext = null,
+				oTemp = null,
+				oCurrent = null,
+				aPages = self.messageListPagenator()
+			;
+
+			_.find(aPages, function (oItem) {
+
+				if (oItem)
+				{
+					if (oCurrent)
+					{
+						oNext = oItem;
+					}
+
+					if (oItem.current)
+					{
+						oCurrent = oItem;
+						oPrev = oTemp;
+					}
+
+					if (oNext)
+					{
+						return true;
+					}
+
+					oTemp = oItem;
+				}
+
+				return false;
+			});
+
+			if (Enums.Layout.NoPreview === SettingsStore.layout() && !self.message())
+			{
+				self.selector.iFocusedNextHelper = bUp ? -1 : 1;
+			}
+			else
+			{
+				self.selector.iSelectNextHelper = bUp ? -1 : 1;
+			}
+
+			if (bUp ? oPrev : oNext)
+			{
+				self.selector.unselect();
+				self.gotoPage(bUp ? oPrev : oNext);
+			}
+
+		}, 350);
+	};
 
 	MessageListMailBoxUserView.prototype.useAutoSelect = function ()
 	{
@@ -288,7 +395,7 @@
 	};
 
 	/**
-	 * @returns {string}
+	 * @return {string}
 	 */
 	MessageListMailBoxUserView.prototype.printableMessageCountForDeletion = function ()
 	{
@@ -300,6 +407,15 @@
 	{
 		this.mainMessageListSearch('');
 		this.inputMessageListSearchFocus(false);
+	};
+
+	MessageListMailBoxUserView.prototype.cancelThreadUid = function ()
+	{
+		kn.setHash(Links.mailBox(
+			FolderStore.currentFolderFullNameHash(),
+			MessageStore.messageListPageBeforeThread(),
+			MessageStore.messageListSearch()
+		));
 	};
 
 	/**
@@ -518,6 +634,41 @@
 		}
 	};
 
+	MessageListMailBoxUserView.prototype.gotoPage = function (oPage)
+	{
+		if (oPage)
+		{
+			kn.setHash(Links.mailBox(
+				FolderStore.currentFolderFullNameHash(),
+				oPage.value,
+				MessageStore.messageListSearch(),
+				MessageStore.messageListThreadUid()
+			));
+		}
+	};
+
+	MessageListMailBoxUserView.prototype.gotoThread = function (oMessage)
+	{
+		if (oMessage && 0 < oMessage.threadsLen())
+		{
+			MessageStore.messageListPageBeforeThread(MessageStore.messageListPage());
+
+			kn.setHash(Links.mailBox(
+				FolderStore.currentFolderFullNameHash(),
+				1,
+				MessageStore.messageListSearch(),
+				oMessage.uid
+			));
+		}
+	};
+
+	MessageListMailBoxUserView.prototype.clearListIsVisible = function ()
+	{
+		return '' === this.messageListSearchDesc() && '' === this.messageListError() &&
+			'' === MessageStore.messageListEndThreadUid() &&
+			0 < this.messageList().length && (this.isSpamFolder() || this.isTrashFolder());
+	};
+
 	MessageListMailBoxUserView.prototype.onBuild = function (oDom)
 	{
 		var self = this;
@@ -529,27 +680,25 @@
 
 		oDom
 			.on('click', '.messageList .b-message-list-wrapper', function () {
-				if (self.message.focused())
+				if (Enums.Focused.MessageView === AppStore.focusedState())
 				{
-					self.message.focused(false);
+					AppStore.focusedState(Enums.Focused.MessageList);
 				}
 			})
 			.on('click', '.e-pagenator .e-page', function () {
-				var oPage = ko.dataFor(this);
-				if (oPage)
-				{
-					kn.setHash(Links.mailBox(
-						FolderStore.currentFolderFullNameHash(),
-						oPage.value,
-						MessageStore.messageListSearch()
-					));
-				}
+				self.gotoPage(ko.dataFor(this));
 			})
 			.on('click', '.messageList .checkboxCkeckAll', function () {
 				self.checkAll(!self.checkAll());
 			})
 			.on('click', '.messageList .messageListItem .flagParent', function () {
 				self.flagMessages(ko.dataFor(this));
+			})
+			.on('click', '.messageList .messageListItem .threads-len', function () {
+				self.gotoThread(ko.dataFor(this));
+			})
+			.on('dblclick', '.messageList .messageListItem .actionHandle', function () {
+				self.gotoThread(ko.dataFor(this));
 			})
 		;
 
@@ -583,37 +732,43 @@
 			}
 		});
 
-		// archive (zip)
-		key('z', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
-			self.archiveCommand();
-			return false;
-		});
-
-		// delete
-		key('delete, shift+delete, shift+3', Enums.KeyState.MessageList, function (event, handler) {
-			if (event)
-			{
-				if (0 < MessageStore.messageListCheckedOrSelected().length)
-				{
-					if (handler && 'shift+delete' === handler.shortcut)
-					{
-						self.deleteWithoutMoveCommand();
-					}
-					else
-					{
-						self.deleteCommand();
-					}
-				}
-
+		if (Settings.capa(Enums.Capa.MessageListActions))
+		{
+			// archive (zip)
+			key('z', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
+				self.archiveCommand();
 				return false;
-			}
-		});
+			});
 
-		// check mail
-		key('ctrl+r, command+r', [Enums.KeyState.FolderList, Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
-			self.reloadCommand();
-			return false;
-		});
+			// delete
+			key('delete, shift+delete, shift+3', Enums.KeyState.MessageList, function (event, handler) {
+				if (event)
+				{
+					if (0 < MessageStore.messageListCheckedOrSelected().length)
+					{
+						if (handler && 'shift+delete' === handler.shortcut)
+						{
+							self.deleteWithoutMoveCommand();
+						}
+						else
+						{
+							self.deleteCommand();
+						}
+					}
+
+					return false;
+				}
+			});
+		}
+
+		if (Settings.capa(Enums.Capa.Reload))
+		{
+			// check mail
+			key('ctrl+r, command+r', [Enums.KeyState.FolderList, Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
+				self.reloadCommand();
+				return false;
+			});
+		}
 
 		// check all
 		key('ctrl+a, command+a', Enums.KeyState.MessageList, function () {
@@ -621,46 +776,80 @@
 			return false;
 		});
 
-		// write/compose (open compose popup)
-		key('w,c', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
-			kn.showScreenPopup(require('View/Popup/Compose'));
+		if (Settings.capa(Enums.Capa.Composer))
+		{
+			// write/compose (open compose popup)
+			key('w,c', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
+				kn.showScreenPopup(require('View/Popup/Compose'));
+				return false;
+			});
+		}
+
+		if (Settings.capa(Enums.Capa.MessageListActions))
+		{
+			// important - star/flag messages
+			key('i', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
+				self.flagMessagesFast();
+				return false;
+			});
+		}
+
+		key('t', [Enums.KeyState.MessageList], function () {
+
+			var oMessage = self.selectorMessageSelected();
+			if (!oMessage)
+			{
+				oMessage = self.selectorMessageFocused();
+			}
+
+			if (oMessage && 0 < oMessage.threadsLen())
+			{
+				self.gotoThread(oMessage);
+			}
+
 			return false;
 		});
 
-		// important - star/flag messages
-		key('i', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
-			self.flagMessagesFast();
-			return false;
-		});
+		if (Settings.capa(Enums.Capa.MessageListActions))
+		{
+			// move
+			key('m', Enums.KeyState.MessageList, function () {
+				self.moveDropdownTrigger(true);
+				return false;
+			});
+		}
 
-		// move
-		key('m', Enums.KeyState.MessageList, function () {
-			self.moveDropdownTrigger(true);
-			return false;
-		});
+		if (Settings.capa(Enums.Capa.MessageListActions))
+		{
+			// read
+			key('q', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
+				self.seenMessagesFast(true);
+				return false;
+			});
 
-		// read
-		key('q', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
-			self.seenMessagesFast(true);
-			return false;
-		});
+			// unread
+			key('u', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
+				self.seenMessagesFast(false);
+				return false;
+			});
+		}
 
-		// unread
-		key('u', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
-			self.seenMessagesFast(false);
-			return false;
-		});
+		if (Settings.capa(Enums.Capa.Composer))
+		{
+			key('shift+f', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
+				self.multyForwardCommand();
+				return false;
+			});
+		}
 
-		key('shift+f', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
-			self.multyForwardCommand();
-			return false;
-		});
-
-		// search input focus
-		key('/', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
-			self.inputMessageListSearchFocus(true);
-			return false;
-		});
+		if (Settings.capa(Enums.Capa.Search))
+		{
+			// search input focus
+			key('/', [Enums.KeyState.MessageList, Enums.KeyState.MessageView], function () {
+				self.inputMessageListSearchFocus(true);
+				return false;
+			});
+		}
 
 		// cancel search
 		key('esc', Enums.KeyState.MessageList, function () {
@@ -669,17 +858,22 @@
 				self.cancelSearch();
 				return false;
 			}
+			else if ('' !== self.messageListEndThreadUid())
+			{
+				self.cancelThreadUid();
+				return false;
+			}
 		});
 
 		// change focused state
 		key('tab, shift+tab, left, right', Enums.KeyState.MessageList, function (event, handler) {
 			if (event && handler && ('shift+tab' === handler.shortcut || 'left' === handler.shortcut))
 			{
-				FolderStore.folderList.focused(true);
+				AppStore.focusedState(Enums.Focused.FolderList);
 			}
 			else if (self.message())
 			{
-				self.message.focused(true);
+				AppStore.focusedState(Enums.Focused.MessageView);
 			}
 
 			return false;
@@ -731,12 +925,18 @@
 
 	MessageListMailBoxUserView.prototype.composeClick = function ()
 	{
-		kn.showScreenPopup(require('View/Popup/Compose'));
+		if (Settings.capa(Enums.Capa.Composer))
+		{
+			kn.showScreenPopup(require('View/Popup/Compose'));
+		}
 	};
 
 	MessageListMailBoxUserView.prototype.advancedSearchClick = function ()
 	{
-		kn.showScreenPopup(require('View/Popup/AdvancedSearch'));
+		if (Settings.capa(Enums.Capa.SearchAdv))
+		{
+			kn.showScreenPopup(require('View/Popup/AdvancedSearch'));
+		}
 	};
 
 	MessageListMailBoxUserView.prototype.quotaTooltip = function ()
@@ -761,7 +961,6 @@
 				'name': 'AppendFile',
 				'queueSize': 1,
 				'multipleSizeLimit': 1,
-				'disableFolderDragAndDrop': true,
 				'hidden': {
 					'Folder': function () {
 						return FolderStore.currentFolderFullNameRaw();

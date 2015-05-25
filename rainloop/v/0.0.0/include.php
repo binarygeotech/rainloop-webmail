@@ -53,6 +53,7 @@ Options -Indexes
 			define('APP_MULTIPLY', 0 < strlen($sPrivateDataFolderInternalName) && APP_DEFAULT_PRIVATE_DATA_NAME !== APP_PRIVATE_DATA_NAME);
 
 			define('APP_DUMMY', '********');
+			define('APP_GOOGLE_ACCESS_TOKEN_PREFIX', ':GAT:');
 			define('APP_DEV_VERSION', '0.0.0');
 			define('APP_API_PATH', 'http://api.rainloop.net/');
 			define('APP_REP_PATH', 'http://repository.rainloop.net/v1/');
@@ -199,25 +200,25 @@ Options -Indexes
 							}
 						}
 
-						$sClearedSiteName = preg_replace('/^(www|demo|rainloop|webmail|email|mail|imap|imap4|smtp|pop|pop3)\./i', '', trim(APP_SITE));
-						if (!empty($sClearedSiteName) && @file_exists(APP_VERSION_ROOT_PATH.'app/domains/default.ini.dist') &&
-							!@file_exists(APP_PRIVATE_DATA.'domains/'.$sClearedSiteName.'.ini'))
-						{
-							$sConfigTemplate = @file_get_contents(APP_VERSION_ROOT_PATH.'app/domains/default.ini.dist');
-							if (!empty($sConfigTemplate))
-							{
-								@file_put_contents(APP_PRIVATE_DATA.'domains/'.$sClearedSiteName.'.ini', strtr($sConfigTemplate, array(
-									'IMAP_HOST' => 'localhost' !== $sClearedSiteName? 'imap.'.$sClearedSiteName : $sClearedSiteName,
-									'IMAP_PORT' => '993',
-									'SMTP_HOST' => 'localhost' !== $sClearedSiteName? 'smtp.'.$sClearedSiteName : $sClearedSiteName,
-									'SMTP_PORT' => '465'
-								)));
-							}
+//						$sClearedSiteName = preg_replace('/^(www|demo|rainloop|webmail|email|mail|imap|imap4|smtp|pop|pop3)\./i', '', trim(APP_SITE));
+//						if (!empty($sClearedSiteName) && @file_exists(APP_VERSION_ROOT_PATH.'app/domains/default.ini.dist') &&
+//							!@file_exists(APP_PRIVATE_DATA.'domains/'.$sClearedSiteName.'.ini'))
+//						{
+//							$sConfigTemplate = @file_get_contents(APP_VERSION_ROOT_PATH.'app/domains/default.ini.dist');
+//							if (!empty($sConfigTemplate))
+//							{
+//								@file_put_contents(APP_PRIVATE_DATA.'domains/'.$sClearedSiteName.'.ini', strtr($sConfigTemplate, array(
+//									'IMAP_HOST' => 'localhost' !== $sClearedSiteName? 'imap.'.$sClearedSiteName : $sClearedSiteName,
+//									'IMAP_PORT' => '993',
+//									'SMTP_HOST' => 'localhost' !== $sClearedSiteName? 'smtp.'.$sClearedSiteName : $sClearedSiteName,
+//									'SMTP_PORT' => '465'
+//								)));
+//							}
+//
+//							unset($sConfigTemplate);
+//						}
 
-							unset($sConfigTemplate);
-						}
-
-						unset($aFiles, $sFile, $sNewFileName, $sNewFile, $sClearedSiteName);
+						unset($aFiles, $sFile, $sNewFileName, $sNewFile);
 					}
 				}
 			}

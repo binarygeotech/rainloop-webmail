@@ -22,6 +22,8 @@
 		FolderStore = require('Stores/User/Folder'),
 		MessageStore = require('Stores/User/Message'),
 
+		Settings = require('Storage/Settings'),
+
 		kn = require('Knoin/Knoin'),
 		AbstractView = require('Knoin/AbstractView')
 	;
@@ -50,7 +52,13 @@
 
 		this.iDropOverTimer = 0;
 
+		this.allowComposer = !!Settings.capa(Enums.Capa.Composer);
 		this.allowContacts = !!AppStore.contactsIsAllowed();
+		this.allowFolders = !!Settings.capa(Enums.Capa.Folders);
+
+		this.folderListFocused = ko.computed(function () {
+			return Enums.Focused.FolderList === AppStore.focusedState();
+		});
 
 		kn.constructorEnd(this);
 	}
@@ -144,7 +152,7 @@
 			var $items = $('.b-folders .e-item .e-link:not(.hidden).focused', oDom);
 			if ($items.length && $items[0])
 			{
-				FolderStore.folderList.focused(false);
+				AppStore.focusedState(Enums.Focused.MessageList);
 				$items.click();
 			}
 
@@ -168,13 +176,13 @@
 		});
 
 		key('esc, tab, shift+tab, right', Enums.KeyState.FolderList, function () {
-			FolderStore.folderList.focused(false);
+			AppStore.focusedState(Enums.Focused.MessageList);
 			return false;
 		});
 
-		FolderStore.folderList.focused.subscribe(function (bValue) {
+		AppStore.focusedState.subscribe(function (mValue) {
 			$('.b-folders .e-item .e-link.focused', oDom).removeClass('focused');
-			if (bValue)
+			if (Enums.Focused.FolderList === mValue)
 			{
 				$('.b-folders .e-item .e-link.selected', oDom).addClass('focused');
 			}
@@ -255,7 +263,10 @@
 
 	FolderListMailBoxUserView.prototype.composeClick = function ()
 	{
-		kn.showScreenPopup(require('View/Popup/Compose'));
+		if (Settings.capa(Enums.Capa.Composer))
+		{
+			kn.showScreenPopup(require('View/Popup/Compose'));
+		}
 	};
 
 	FolderListMailBoxUserView.prototype.createFolder = function ()

@@ -91,8 +91,12 @@ class Api
 			\MailSo\Config::$MessageListDateFilter =
 				(int) \RainLoop\Api::Config()->Get('labs', 'imap_message_list_date_filter', 0);
 
+			\MailSo\Config::$MessageListPermanentFilter =
+				\trim(\RainLoop\Api::Config()->Get('labs', 'imap_message_list_permanent_filter', ''));
+
 			\MailSo\Config::$LargeThreadLimit =
 				(int) \RainLoop\Api::Config()->Get('labs', 'imap_large_thread_limit', 50);
+
 
 			\MailSo\Config::$SystemLogger = \RainLoop\Api::Logger();
 
@@ -139,12 +143,13 @@ class Api
 	{
 		$sSsoHash = \MailSo\Base\Utils::Sha1Rand($sEmail.$sPassword);
 
-		return \RainLoop\Api::Actions()->Cacher()->Set(\RainLoop\KeyPathHelper::SsoCacherKey($sSsoHash), \RainLoop\Utils::EncodeKeyValues(array(
-			'Email' => $sEmail,
-			'Password' => $sPassword,
-			'AdditionalOptions' => $aAdditionalOptions,
-			'Time' => $bUseTimeout ? \time() : 0
-		))) ? $sSsoHash : '';
+		return \RainLoop\Api::Actions()->Cacher()->Set(\RainLoop\KeyPathHelper::SsoCacherKey($sSsoHash),
+			\RainLoop\Utils::EncodeKeyValuesQ(array(
+				'Email' => $sEmail,
+				'Password' => $sPassword,
+				'AdditionalOptions' => $aAdditionalOptions,
+				'Time' => $bUseTimeout ? \time() : 0
+			))) ? $sSsoHash : '';
 	}
 
 	/**

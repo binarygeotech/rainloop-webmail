@@ -21,54 +21,27 @@
 	{
 		AbstractView.call(this, 'Popups', 'PopupsLanguages');
 
-		this.LanguageStore = require('Stores/Language');
+		var self = this;
 
-		this.exp = ko.observable(false);
+		this.fLang = null;
+		this.userLanguage = ko.observable('');
+
+		this.langs = ko.observableArray([]);
 
 		this.languages = ko.computed(function () {
-			return _.map(this.LanguageStore.languages(), function (sLanguage) {
+			var sUserLanguage = self.userLanguage();
+			return _.map(self.langs(), function (sLanguage) {
 				return {
 					'key': sLanguage,
+					'user': sLanguage === sUserLanguage,
 					'selected': ko.observable(false),
 					'fullName': Utils.convertLangName(sLanguage)
 				};
 			});
-		}, this);
+		});
 
-		this.languagesTop = ko.computed(function () {
-
-			var
-				aTop = this.LanguageStore.languagesTop(),
-				aLangs = this.languages()
-			;
-
-			return 0 < aTop.length ? _.compact(_.map(aTop, function (sLang) {
-				return _.find(aLangs, function (aItem) {
-					return aItem && sLang === aItem.key;
-				});
-			})) : [];
-		}, this);
-
-		this.languagesBottom = ko.computed(function () {
-
-			var
-				aTop = this.languagesTop(),
-				aLangs = this.languages()
-			;
-
-			if (0 < aTop.length)
-			{
-				return _.filter(aLangs, function (aItem) {
-					return -1 === Utils.inArray(aItem, aTop);
-				});
-			}
-
-			return aLangs;
-
-		}, this);
-
-		this.LanguageStore.language.subscribe(function () {
-			this.resetMainLanguage();
+		this.langs.subscribe(function () {
+			this.setLanguageSelection();
 		}, this);
 
 		kn.constructorEnd(this);
@@ -77,35 +50,43 @@
 	kn.extendAsViewModel(['View/Popup/Languages', 'PopupsLanguagesViewModel'], LanguagesPopupView);
 	_.extend(LanguagesPopupView.prototype, AbstractView.prototype);
 
-	LanguagesPopupView.prototype.languageEnName = function (sLanguage)
+	LanguagesPopupView.prototype.languageTooltipName = function (sLanguage)
 	{
 		var sResult = Utils.convertLangName(sLanguage, true);
-		return 'English' === sResult ? '' : sResult;
+		return Utils.convertLangName(sLanguage, false) === sResult ? '' : sResult;
 	};
 
-	LanguagesPopupView.prototype.resetMainLanguage = function ()
+	LanguagesPopupView.prototype.setLanguageSelection = function ()
 	{
-		var sCurrent = this.LanguageStore.language();
+		var sCurrent = this.fLang ? ko.unwrap(this.fLang) : '';
 		_.each(this.languages(), function (oItem) {
 			oItem['selected'](oItem['key'] === sCurrent);
 		});
 	};
 
-	LanguagesPopupView.prototype.onShow = function ()
+	LanguagesPopupView.prototype.onBeforeShow = function ()
 	{
-		this.exp(true);
+		this.fLang = null;
+		this.userLanguage('');
 
-		this.resetMainLanguage();
+		this.langs([]);
 	};
 
-	LanguagesPopupView.prototype.onHide = function ()
+	LanguagesPopupView.prototype.onShow = function (fLanguage, aLangs, sUserLanguage)
 	{
-		this.exp(false);
+		this.fLang = fLanguage;
+		this.userLanguage(sUserLanguage || '');
+
+		this.langs(aLangs);
 	};
 
 	LanguagesPopupView.prototype.changeLanguage = function (sLang)
 	{
-		this.LanguageStore.language(sLang);
+		if (this.fLang)
+		{
+			this.fLang(sLang);
+		}
+
 		this.cancelCommand();
 	};
 

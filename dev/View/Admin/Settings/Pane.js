@@ -26,6 +26,7 @@
 		this.version = ko.observable(Settings.settingsGet('Version'));
 
 		this.capa = !!Settings.settingsGet('PremType');
+		this.community = RL_COMMUNITY;
 
 		this.adminManLoading = ko.computed(function () {
 			return '000' !== [
@@ -48,7 +49,7 @@
 	PaneSettingsAdminView.prototype.logoutClick = function ()
 	{
 		Remote.adminLogout(function () {
-			require('App/Admin').loginAndLogoutReload(true);
+			require('App/Admin').loginAndLogoutReload(true, true);
 		});
 	};
 

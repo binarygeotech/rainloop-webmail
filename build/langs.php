@@ -1,6 +1,7 @@
 <?php
 
-define('LANGS_PATH', __DIR__.'/../rainloop/v/0.0.0/langs');
+\define('IS_ADMIN', isset($_GET['admin']) && '1' === (string) $_GET['admin']);
+\define('LANGS_PATH', __DIR__.'/../rainloop/v/0.0.0/langs'.(IS_ADMIN ? '/admin' : ''));
 
 function getLangStructure($sLangFile)
 {
@@ -47,7 +48,7 @@ function saveLangStructure($sLangFile, $aLang)
 		}
 	}
 
-	\file_put_contents(LANGS_PATH.'/'.$sLangFile, implode("\n", $aResultLines));
+	\file_put_contents(LANGS_PATH.'/'.$sLangFile, implode("\n", $aResultLines)."\n");
 }
 
 $sNL = "\n";

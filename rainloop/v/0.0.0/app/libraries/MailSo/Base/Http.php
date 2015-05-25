@@ -567,6 +567,12 @@ class Http
 			return false;
 		}
 
+		$sUrl = \trim($sUrl);
+		if ('//' === substr($sUrl, 0, 2))
+		{
+			$sUrl = 'http:'.$sUrl;
+		}
+
 		$aOptions = array(
 			CURLOPT_URL => $sUrl,
 			CURLOPT_HEADER => false,
@@ -679,10 +685,10 @@ class Http
 			{
 				if ($bSetCacheHeader)
 				{
-					\header('Cache-Control: public', true);
-					\header('Pragma: public', true);
-					\header('Last-Modified: '.\gmdate('D, d M Y H:i:s', $iUtcTimeStamp - $iExpireTime).' UTC', true);
-					\header('Expires: '.\gmdate('D, j M Y H:i:s', $iUtcTimeStamp + $iExpireTime).' UTC', true);
+					@\header('Cache-Control: public', true);
+					@\header('Pragma: public', true);
+					@\header('Last-Modified: '.\gmdate('D, d M Y H:i:s', $iUtcTimeStamp - $iExpireTime).' UTC', true);
+					@\header('Expires: '.\gmdate('D, j M Y H:i:s', $iUtcTimeStamp + $iExpireTime).' UTC', true);
 
 					if (0 < strlen($sEtag))
 					{
@@ -714,7 +720,6 @@ class Http
 			@\header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 			@\header('Cache-Control: post-check=0, pre-check=0', false);
 			@\header('Pragma: no-cache');
-			@\header('X-RainLoop-Cache: no');
 		}
 	}
 
@@ -734,7 +739,6 @@ class Http
 			@\header('ETag: '.$sEtag, true);
 			@\header('Last-Modified: '.\gmdate('D, d M Y H:i:s', $iLastModified).' UTC', true);
 			@\header('Expires: '.\gmdate('D, j M Y H:i:s', $iExpires).' UTC', true);
-			@\header('X-RainLoop-Cache: yes');
 		}
 	}
 

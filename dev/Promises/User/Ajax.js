@@ -11,11 +11,10 @@
 //		Utils = require('Common/Utils'),
 //		Base64 = require('Common/Base64'),
 //		Cache = require('Common/Cache'),
+//		Links = require('Common/Links'),
 //
 //		AppStore = require('Stores/User/App'),
 //		SettingsStore = require('Stores/User/Settings'),
-
-		MessageSimpleModel = require('Model/MessageSimple'),
 
 		PromisesPopulator = require('Promises/User/Populator'),
 		AbstractAjaxPromises = require('Promises/AbstractAjax')
@@ -28,45 +27,9 @@
 	function UserAjaxUserPromises()
 	{
 		AbstractAjaxPromises.call(this);
-
-		this.messageListSimpleHash = '';
-		this.messageListSimpleCache = null;
-
-		this.sSubSubQuery = '&ss=/';
 	}
 
 	_.extend(UserAjaxUserPromises.prototype, AbstractAjaxPromises.prototype);
-
-	UserAjaxUserPromises.prototype.messageListSimple = function (sFolder, aUids, fTrigger)
-	{
-		var self = this, sHash = sFolder + '~' + aUids.join('/');
-		if (sHash === this.messageListSimpleHash && this.messageListSimpleCache)
-		{
-			return this.fastResolve(this.messageListSimpleCache);
-		}
-
-		return this.abort('MessageListSimple')
-			.postRequest('MessageListSimple', fTrigger, {
-				'Folder': sFolder,
-				'Uids': aUids
-			}).then(function (oData) {
-
-				self.messageListSimpleHash = sHash;
-				self.messageListSimpleCache = _.compact(_.map(oData.Result, function (aItem) {
-					return MessageSimpleModel.newInstanceFromJson(aItem);
-				}));
-
-				return self.messageListSimpleCache;
-
-			}, function (iError) {
-
-				self.messageListSimpleHash = '';
-				self.messageListSimpleCache = null;
-
-				return self.fastReject(iError);
-			})
-		;
-	};
 
 	UserAjaxUserPromises.prototype.foldersReload = function (fTrigger)
 	{
@@ -89,7 +52,6 @@
 			self.foldersReload(fTrigger);
 		}, 500);
 	};
-
 
 	UserAjaxUserPromises.prototype.folderDelete = function (sFolderFullNameRaw, fTrigger)
 	{
@@ -114,6 +76,62 @@
 		});
 	};
 
+	UserAjaxUserPromises.prototype.attachmentsActions = function (sAction, aHashes, fTrigger)
+	{
+		return this.postRequest('AttachmentsActions', fTrigger, {
+			'Do': sAction,
+			'Hashes': aHashes
+		});
+	};
+
+	UserAjaxUserPromises.prototype.welcomeClose = function ()
+	{
+		return this.postRequest('WelcomeClose');
+	};
+
+//	UserAjaxUserPromises.prototype.messageList = function (sFolderFullNameRaw, iOffset, iLimit, sSearch, fTrigger)
+//	{
+//		sFolderFullNameRaw = Utils.pString(sFolderFullNameRaw);
+//		sSearch = Utils.pString(sSearch);
+//		iOffset = Utils.pInt(iOffset);
+//		iLimit = Utils.pInt(iLimit);
+//
+//		var sFolderHash = Cache.getFolderHash(sFolderFullNameRaw);
+//
+//		if ('' !== sFolderHash && ('' === sSearch || -1 === sSearch.indexOf('is:')))
+//		{
+//			return this.abort('MessageList')
+//				.getRequest('MessageList', fTrigger,
+//					Links.subQueryPrefix() + '/' + Base64.urlsafe_encode([
+//						sFolderFullNameRaw,
+//						iOffset,
+//						iLimit,
+//						sSearch,
+//						AppStore.projectHash(),
+//						sFolderHash,
+//						Cache.getFolderInboxName() === sFolderFullNameRaw ? Cache.getFolderUidNext(sFolderFullNameRaw) : '',
+//						AppStore.threadsAllowed() && SettingsStore.useThreads() ? '1' : '0',
+//						''
+//					].join(String.fromCharCode(0))))
+//				.then(PromisesPopulator.messageList);
+//		}
+//		else
+//		{
+//			return this.abort('MessageList')
+//				.postRequest('MessageList', fTrigger,{
+//					'Folder': sFolderFullNameRaw,
+//					'Offset': iOffset,
+//					'Limit': iLimit,
+//					'Search': sSearch,
+//					'UidNext': Cache.getFolderInboxName() === sFolderFullNameRaw ? Cache.getFolderUidNext(sFolderFullNameRaw) : '',
+//					'UseThreads': AppStore.threadsAllowed() && SettingsStore.useThreads() ? '1' : '0'
+//				})
+//				.then(PromisesPopulator.messageList);
+//		}
+//
+//		return this.fastReject(Enums.Notification.UnknownError);
+//	};
+//
 //	UserAjaxUserPromises.prototype.message = function (sFolderFullNameRaw, iUid, fTrigger)
 //	{
 //		sFolderFullNameRaw = Utils.pString(sFolderFullNameRaw);
@@ -123,7 +141,7 @@
 //		{
 //			return this.abort('Message')
 //				.getRequest('Message', fTrigger,
-//					this.sSubSubQuery + Base64.urlsafe_encode([
+//					Links.subQueryPrefix() + '/' + Base64.urlsafe_encode([
 //						sFolderFullNameRaw, iUid,
 //						AppStore.projectHash(),
 //						AppStore.threadsAllowed() && SettingsStore.useThreads() ? '1' : '0'

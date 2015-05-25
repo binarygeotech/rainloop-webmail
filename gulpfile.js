@@ -1,11 +1,16 @@
-/* RainLoop Webmail (c) RainLoop Team | Licensed under CC BY-NC-SA 3.0 */
+/* RainLoop Webmail (c) RainLoop Team | Licensed under AGPL 3 */
 'use strict';
 
 var
 	pkg = require('./package.json'),
+	head = {
+		rainloop: '/* RainLoop Webmail (c) RainLoop Team | Licensed under RainLoop Software License */',
+		agpl: '/* RainLoop Webmail (c) RainLoop Team | Licensed under AGPL v3 */'
+	},
 	cfg = {
 		devVersion: '0.0.0',
 		releasesPath: 'build/dist/releases',
+		community: true,
 
 		rainloopBuilded: false,
 		destPath: '',
@@ -38,6 +43,11 @@ var
 	plumber = require('gulp-plumber'),
 	gutil = require('gulp-util')
 ;
+
+function getHead()
+{
+	return !cfg.community ? head.rainloop : head.agpl;
+}
 
 function regOtherMinTask(sName, sPath, sInc, sOut, sHeader)
 {
@@ -83,7 +93,10 @@ cfg.paths.less = {
 		src: 'dev/Styles/@Main.less',
 		watch: ['dev/Styles/*.less'],
 		options: {
-			paths: [path.join(__dirname, 'dev/Styles/'), path.join(__dirname, 'vendors/bootstrap/less/')]
+			paths: [
+				path.join(__dirname, 'dev', 'Styles'),
+				path.join(__dirname, 'vendors', 'bootstrap', 'less')
+			]
 		}
 	}
 };
@@ -99,6 +112,7 @@ cfg.paths.css = {
 			'vendors/jquery-letterfx/jquery-letterfx.min.css',
 			'vendors/simple-pace/styles.css',
 			'vendors/inputosaurus/inputosaurus.css',
+			'vendors/opentip/opentip.css',
 			'vendors/photoswipe/photoswipe.css',
 			'vendors/photoswipe/default-skin/default-skin.css',
 			'vendors/flags/flags-fixed.css',
@@ -141,10 +155,8 @@ cfg.paths.js = {
 		src: [
 			'vendors/modernizr.js',
 			'vendors/underscore/1.6.0/underscore-min.js',
-			'vendors/is.js/is.min.js',
 			'vendors/jquery/jquery-1.11.2.min.js',
 			'vendors/jquery-ui/js/jquery-ui-1.10.3.custom.min.js',
-//			'vendors/jquery-ui.touch-punch/jquery.ui.touch-punch.min.js',
 			'vendors/jquery-cookie/jquery.cookie-1.4.0.min.js',
 			'vendors/jquery-finger/jquery.finger.min.js',
 			'vendors/jquery-mousewheel/jquery.mousewheel-3.1.4.min.js',
@@ -162,13 +174,12 @@ cfg.paths.js = {
 			'vendors/routes/hasher.min.js',
 			'vendors/routes/crossroads.min.js',
 			'vendors/knockout/knockout-3.3.0.js',
-//			'vendors/knockout-punches/knockout.punches.min.js',
 			'vendors/knockout-projections/knockout-projections-1.0.0.min.js',
 			'vendors/knockout-sortable/knockout-sortable.min.js',
 			'vendors/ssm/ssm.min.js',
 			'vendors/jua/jua.min.js',
-			'vendors/buzz/buzz.min.js',
 			'vendors/Q/q.min.js',
+			'vendors/opentip/opentip-jquery.min.js',
 			'vendors/Autolinker/Autolinker.min.js',
 			'vendors/photoswipe/photoswipe.min.js',
 			'vendors/photoswipe/photoswipe-ui-default.min.js',
@@ -217,6 +228,16 @@ gulp.task('css:main-begin', ['less:main'], function() {
 		.pipe(eol('\n', true))
 		.pipe(gulp.dest(cfg.paths.staticCSS))
 	;
+});
+
+gulp.task('package:community-on', function() {
+	cfg.community = true;
+	return true;
+});
+
+gulp.task('package:community-off', function() {
+	cfg.community = false;
+	return true;
 });
 
 gulp.task('css:clear-less', ['css:main-begin'], function() {
@@ -289,6 +310,7 @@ gulp.task('js:webpack:clear', function() {
 });
 
 gulp.task('js:webpack', ['js:webpack:clear'], function(callback) {
+
 	var
 		webpack = require('webpack'),
 		webpackCfg = require('./webpack.config.js')
@@ -297,6 +319,13 @@ gulp.task('js:webpack', ['js:webpack:clear'], function(callback) {
 	if (webpackCfg && webpackCfg.output)
 	{
 		webpackCfg.output.publicPath = cfg.paths.staticJS;
+	}
+
+	if (webpackCfg && webpackCfg.plugins)
+	{
+		webpackCfg.plugins.push(new webpack.DefinePlugin({
+            'RL_COMMUNITY': !!cfg.community
+        }));
 	}
 
 	webpack(webpackCfg, function(err, stats) {
@@ -310,7 +339,7 @@ gulp.task('js:webpack', ['js:webpack:clear'], function(callback) {
 
 gulp.task('js:app', ['js:webpack'], function() {
 	return gulp.src(cfg.paths.staticJS + cfg.paths.js.app.name)
-		.pipe(header('/* RainLoop Webmail (c) RainLoop Team | Licensed under CC BY-NC-SA 3.0 */\n'))
+		.pipe(header(getHead() + '\n'))
 		.pipe(eol('\n', true))
 		.pipe(gulp.dest(cfg.paths.staticJS))
 		.on('error', gutil.log);
@@ -318,7 +347,7 @@ gulp.task('js:app', ['js:webpack'], function() {
 
 gulp.task('js:admin', ['js:webpack'], function() {
 	return gulp.src(cfg.paths.staticJS + cfg.paths.js.admin.name)
-		.pipe(header('/* RainLoop Webmail (c) RainLoop Team | Licensed under CC BY-NC-SA 3.0 */\n'))
+		.pipe(header(getHead() + '\n'))
 		.pipe(eol('\n', true))
 		.pipe(gulp.dest(cfg.paths.staticJS))
 		.on('error', gutil.log);
@@ -326,7 +355,7 @@ gulp.task('js:admin', ['js:webpack'], function() {
 
 gulp.task('js:chunks', ['js:webpack'], function() {
 	return gulp.src(cfg.paths.staticJS + '*.subapp.js')
-		.pipe(header('/* RainLoop Webmail (c) RainLoop Team | Licensed under CC BY-NC-SA 3.0 */\n'))
+		.pipe(header(getHead() + '\n'))
 		.pipe(eol('\n', true))
 		.pipe(gulp.dest(cfg.paths.staticJS))
 		.on('error', gutil.log);
@@ -337,7 +366,7 @@ gulp.task('js:min', ['js:app', 'js:admin', 'js:chunks'], function() {
 	return gulp.src(cfg.paths.staticJS + '*.js')
 		.pipe(replace(/"rainloop\/v\/([^\/]+)\/static\/js\/"/g, '"rainloop/v/$1/static/js/min/"'))
 		.pipe(uglify(cfg.uglify))
-		.pipe(header('/* RainLoop Webmail (c) RainLoop Team | Licensed under CC BY-NC-SA 3.0 */\n'))
+		.pipe(header(getHead() + '\n'))
 		.pipe(eol('\n', true))
 		.pipe(gulp.dest(cfg.paths.staticMinJS))
 		.on('error', gutil.log);
@@ -425,7 +454,6 @@ gulp.task('ckeditor:copy-plugins', ['ckeditor:copy'], function() {
 gulp.task('ckeditor', ['ckeditor:copy-plugins'], function () {
 	return gulp.src('rainloop/v/' + cfg.devVersion + '/static/ckeditor/*.js')
 		.pipe(stripbom())
-//		.pipe(replace("\u200B", "\\u200B"))
 		.pipe(replace('console.log("Detecting changes using MutationObservers")', 'true'))
 		.pipe(header("\uFEFF")) // BOM
 		.pipe(gulp.dest('rainloop/v/' + cfg.devVersion + '/static/ckeditor'));
@@ -462,10 +490,15 @@ gulp.task('rainloop:setup', ['rainloop:copy'], function() {
 
 	fs.writeFileSync(dist + 'rainloop/v/' + versionFull + '/index.php.root', fs.readFileSync(dist + 'index.php'));
 
+	if (cfg.community)
+	{
+		require('rimraf').sync(dist + 'rainloop/v/' + versionFull + '/app/libraries/RainLoop/Prem/');
+	}
+
 	cfg.destPath = cfg.releasesPath + '/webmail/' + versionFull + '/';
 	cfg.cleanPath = dist;
 	cfg.zipSrcPath = dist;
-	cfg.zipFile = 'rainloop-' + versionFull + '.zip';
+	cfg.zipFile = 'rainloop-' + (cfg.community ? 'community-' : '') + versionFull + '.zip';
 	cfg.md5File = cfg.zipFile;
 
 	cfg.rainloopBuilded = true;
@@ -529,7 +562,10 @@ gulp.task('rainloop:owncloud:setup', ['rainloop:owncloud:copy',
 	;
 
 	fs.writeFileSync(dist + 'rainloop/appinfo/info.xml',
-		fs.readFileSync(dist + 'rainloop/appinfo/info.xml', 'utf8').replace('<version>0.0</version>', '<version>' + versionFull + '</version>'));
+		fs.readFileSync(dist + 'rainloop/appinfo/info.xml', 'utf8')
+			.replace('<version>0.0</version>', '<version>' + versionFull + '</version>')
+			.replace('<licence></licence>', '<licence>' + (cfg.community ? 'AGPLv3' : 'RainLoop Software License') + '</licence>')
+		);
 
 	fs.writeFileSync(dist + 'rainloop/appinfo/version', versionFull);
 	fs.writeFileSync(dist + 'rainloop/VERSION', versionFull);
@@ -537,7 +573,7 @@ gulp.task('rainloop:owncloud:setup', ['rainloop:owncloud:copy',
 	cfg.destPath = cfg.releasesPath + '/owncloud/' + versionFull + '/';
 	cfg.cleanPath = dist;
 	cfg.zipSrcPath = dist;
-	cfg.zipFile = 'rainloop-owncloud-app-' + versionFull + '.zip';
+	cfg.zipFile = 'rainloop-owncloud-app-' + (cfg.community ? '' : 'standard-') + versionFull + '.zip';
 	cfg.md5File = cfg.zipFile;
 
 });
@@ -558,29 +594,51 @@ gulp.task('rainloop:owncloud:clean', ['rainloop:owncloud:copy', 'rainloop:ownclo
 
 // MAIN
 gulp.task('default', ['js:libs', 'js:boot', 'js:openpgp', 'js:min', 'css:main:min', 'ckeditor', 'fontastic']);
-gulp.task('fast', ['js:app', 'js:admin', 'js:chunks', 'css:main']);
+gulp.task('fast-', ['js:app', 'js:admin', 'js:chunks', 'css:main']);
+
+gulp.task('fast', ['package:community-on', 'fast-']);
+gulp.task('fast+', ['package:community-off', 'fast-']);
 
 gulp.task('rainloop:start', ['js:lint', 'rainloop:copy', 'rainloop:setup']);
-gulp.task('rainloop', ['rainloop:start', 'rainloop:zip', 'rainloop:md5', 'rainloop:clean']);
 
-gulp.task('owncloud', ['rainloop:owncloud:copy',
+gulp.task('rainloop-', ['rainloop:start', 'rainloop:zip', 'rainloop:md5', 'rainloop:clean']);
+
+gulp.task('rainloop', ['package:community-on', 'rainloop-']);
+gulp.task('rainloop+', ['package:community-off', 'rainloop-']);
+
+gulp.task('owncloud-', ['rainloop:owncloud:copy',
 	'rainloop:owncloud:copy-rainloop', 'rainloop:owncloud:copy-rainloop:clean',
 	'rainloop:owncloud:setup', 'rainloop:owncloud:zip', 'rainloop:owncloud:md5', 'rainloop:owncloud:clean']);
 
+gulp.task('owncloud', ['package:community-on', 'owncloud-']);
+gulp.task('owncloud+', ['package:community-off', 'owncloud-']);
+
 //WATCH
 gulp.task('watch', ['fast'], function() {
-	gulp.watch(cfg.paths.globjs, {interval: 500}, ['js:app', 'js:admin']);
-	gulp.watch(cfg.paths.less.main.watch, {interval: 500}, ['css:main']);
+	gulp.watch(cfg.paths.globjs, {interval: 1000}, ['js:app', 'js:admin']);
+	gulp.watch(cfg.paths.less.main.watch, {interval: 1000}, ['css:main']);
+});
+
+gulp.task('watch+', ['fast+'], function() {
+	gulp.watch(cfg.paths.globjs, {interval: 1000}, ['js:app', 'js:admin']);
+	gulp.watch(cfg.paths.less.main.watch, {interval: 1000}, ['css:main']);
 });
 
 // ALIASES
 gulp.task('build', ['rainloop']);
+gulp.task('build+', ['rainloop+']);
 gulp.task('js:hint', ['js:lint']);
 
-gulp.task('own', ['owncloud']);
-gulp.task('rl', ['rainloop']);
 gulp.task('w', ['watch']);
+gulp.task('w+', ['watch+']);
 gulp.task('f', ['fast']);
-gulp.task('o', ['owncloud']);
+gulp.task('f+', ['fast+']);
+
 gulp.task('b', ['build']);
+gulp.task('b+', ['build+']);
+
+gulp.task('o', ['owncloud']);
+gulp.task('o+', ['owncloud+']);
+
 gulp.task('h', ['js:lint']);
+gulp.task('l', ['js:lint']);

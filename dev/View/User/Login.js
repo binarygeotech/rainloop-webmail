@@ -6,7 +6,6 @@
 	var
 		window = require('window'),
 		_ = require('_'),
-		$ = require('$'),
 		ko = require('ko'),
 
 		Enums = require('Common/Enums'),
@@ -43,6 +42,7 @@
 
 		this.additionalCode = ko.observable('');
 		this.additionalCode.error = ko.observable(false);
+		this.additionalCode.errorAnimation = ko.observable(false).extend({'falseTimeout': 500});
 		this.additionalCode.focused = ko.observable(false);
 		this.additionalCode.visibility = ko.observable(false);
 		this.additionalCodeSignMe = ko.observable(false);
@@ -56,6 +56,16 @@
 
 		this.emailError = ko.observable(false);
 		this.passwordError = ko.observable(false);
+
+		this.emailErrorAnimation = ko.observable(false).extend({'falseTimeout': 500});
+		this.passwordErrorAnimation = ko.observable(false).extend({'falseTimeout': 500});
+
+		this.formHidden = ko.observable(false);
+
+		this.formError = ko.computed(function () {
+			return this.emailErrorAnimation() || this.passwordErrorAnimation() ||
+				(this.additionalCode.visibility() && this.additionalCode.errorAnimation());
+		}, this);
 
 		this.emailFocus = ko.observable(false);
 		this.passwordFocus = ko.observable(false);
@@ -79,6 +89,18 @@
 			this.additionalCode.error(false);
 		}, this);
 
+		this.emailError.subscribe(function (bV) {
+			this.emailErrorAnimation(!!bV);
+		}, this);
+
+		this.passwordError.subscribe(function (bV) {
+			this.passwordErrorAnimation(!!bV);
+		}, this);
+
+		this.additionalCode.error.subscribe(function (bV) {
+			this.additionalCode.errorAnimation(!!bV);
+		}, this);
+
 		this.submitRequest = ko.observable(false);
 		this.submitError = ko.observable('');
 		this.submitErrorAddidional = ko.observable('');
@@ -94,6 +116,7 @@
 
 		this.langRequest = ko.observable(false);
 		this.language = LanguageStore.language;
+		this.languages = LanguageStore.languages;
 
 		this.bSendLanguage = false;
 
@@ -115,16 +138,34 @@
 
 			Utils.triggerAutocompleteInputChange();
 
+			this.emailError(false);
+			this.passwordError(false);
+
 			this.emailError('' === Utils.trim(this.email()));
 			this.passwordError('' === Utils.trim(this.password()));
 
 			if (this.additionalCode.visibility())
 			{
+				this.additionalCode.error(false);
 				this.additionalCode.error('' === Utils.trim(this.additionalCode()));
 			}
 
-			if (this.emailError() || this.passwordError() || this.additionalCode.error())
+			if (this.emailError() || this.passwordError() ||
+				(this.additionalCode.visibility() && this.additionalCode.error()))
 			{
+				switch (true)
+				{
+					case this.emailError():
+						this.emailFocus(true);
+						break;
+					case this.passwordError():
+						this.passwordFocus(true);
+						break;
+					case this.additionalCode.visibility() && this.additionalCode.error():
+						this.additionalCode.focused(true);
+						break;
+				}
+
 				return false;
 			}
 
@@ -176,7 +217,7 @@
 								}
 								else
 								{
-									require('App/User').loginAndLogoutReload();
+									require('App/User').loginAndLogoutReload(false);
 								}
 							}
 							else if (oData.ErrorCode)
@@ -265,6 +306,17 @@
 			return !this.submitRequest() && this.googleLoginEnabled();
 		});
 
+		this.googleXAuthCommand = Utils.createCommand(this, function () {
+
+			window.open(Links.socialGoogle(true), 'Google',
+				'left=200,top=100,width=650,height=450,menubar=no,status=no,resizable=yes,scrollbars=yes');
+
+			return true;
+
+		}, function () {
+			return !this.submitRequest() && this.googleLoginEnabled();
+		});
+
 		this.twitterLoginEnabled = ko.observable(false);
 
 		this.twitterCommand = Utils.createCommand(this, function () {
@@ -318,11 +370,6 @@
 		{
 			this.emailFocus(true);
 		}
-
-		if (Settings.settingsGet('UserLanguage'))
-		{
-			$.cookie('rllang', LanguageStore.language(), {'expires': 30});
-		}
 	};
 
 	LoginUserView.prototype.onHide = function ()
@@ -344,7 +391,7 @@
 				if (0 === iErrorCode)
 				{
 					self.submitRequest(true);
-					require('App/User').loginAndLogoutReload();
+					require('App/User').loginAndLogoutReload(false);
 				}
 				else
 				{
@@ -406,10 +453,9 @@
 
 				self.langRequest(true);
 
-				Translator.reload(sValue, function() {
+				Translator.reload(false, sValue, function() {
 					self.langRequest(false);
 					self.bSendLanguage = true;
-					$.cookie('rllang', sValue, {'expires': 30});
 				}, function() {
 					self.langRequest(false);
 				});
@@ -427,7 +473,24 @@
 
 	LoginUserView.prototype.selectLanguage = function ()
 	{
-		kn.showScreenPopup(require('View/Popup/Languages'));
+		kn.showScreenPopup(require('View/Popup/Languages'), [
+			this.language, this.languages(), LanguageStore.userLanguage()
+		]);
+	};
+
+	LoginUserView.prototype.selectLanguageOnTab = function (bShift)
+	{
+		if (!bShift)
+		{
+			var self = this;
+			_.delay(function () {
+				self.emailFocus(true);
+			}, 5);
+
+			return false;
+		}
+
+		return true;
 	};
 
 	module.exports = LoginUserView;

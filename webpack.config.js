@@ -20,6 +20,7 @@ module.exports = {
 		modulesDirectories: [__dirname + '/dev/'],
 		extensions: ['', '.js'],
 		alias: {
+			"Opentip": __dirname  + "/dev/External/Opentip.js",
 			"ko": __dirname  + "/dev/External/ko.js"
 		}
 	},
@@ -39,7 +40,6 @@ module.exports = {
 		'Jua': 'window.Jua',
 		'Autolinker': 'window.Autolinker',
 		'Tinycon': 'window.Tinycon',
-		'buzz': 'window.buzz',
 		'ssm': 'window.ssm',
 		'key': 'window.key',
 		'_': 'window._',

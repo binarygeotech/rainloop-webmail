@@ -91,6 +91,15 @@
 	};
 
 	/**
+	 * @param {*} mValue
+	 * @return {boolean}
+	 */
+	Utils.pBool = function (mValue)
+	{
+		return !!mValue;
+	};
+
+	/**
 	 * @param {string} sComponent
 	 * @return {string}
 	 */
@@ -135,12 +144,17 @@
 	/**
 	 * @param {string} sMailToUrl
 	 * @param {Function} PopupComposeVoreModel
-	 * @returns {boolean}
+	 * @return {boolean}
 	 */
 	Utils.mailToHelper = function (sMailToUrl, PopupComposeVoreModel)
 	{
 		if (sMailToUrl && 'mailto:' === sMailToUrl.toString().substr(0, 7).toLowerCase())
 		{
+			if (!PopupComposeVoreModel)
+			{
+				return true;
+			}
+
 			sMailToUrl = sMailToUrl.toString().substr(7);
 
 			var
@@ -525,14 +539,14 @@
 				oEvent.preventDefault();
 				return;
 			}
-
-			if (oSender && oSender.tagName && oSender.tagName.match(/INPUT|TEXTAREA/i))
+			else if (iKey === Enums.EventKeyCode.A)
 			{
-				return;
-			}
+				if (oSender && ('true' === '' + oSender.contentEditable ||
+					(oSender.tagName && oSender.tagName.match(/INPUT|TEXTAREA/i))))
+				{
+					return;
+				}
 
-			if (iKey === Enums.EventKeyCode.A)
-			{
 				if (window.getSelection)
 				{
 					window.getSelection().removeAllRanges();
@@ -589,7 +603,7 @@
 	 * @param {string} sTheme
 	 * @return {string}
 	 */
-	Utils.convertThemeName = function (sTheme)
+	Utils.convertThemeName = _.memoize(function (sTheme)
 	{
 		if ('@custom' === sTheme.substr(-7))
 		{
@@ -597,7 +611,7 @@
 		}
 
 		return Utils.trim(sTheme.replace(/[^a-zA-Z0-9]+/g, ' ').replace(/([A-Z])/g, ' $1').replace(/[\s]+/g, ' '));
-	};
+	});
 
 	/**
 	 * @param {string} sName
@@ -813,40 +827,6 @@
 
 			sText = '',
 
-			splitPlainText = function (sText)
-			{
-				var
-					iLen = 100,
-					sPrefix = '',
-					sSubText = '',
-					sResult = sText,
-					iSpacePos = 0,
-					iNewLinePos = 0
-				;
-
-				while (sResult.length > iLen)
-				{
-					sSubText = sResult.substring(0, iLen);
-					iSpacePos = sSubText.lastIndexOf(' ');
-					iNewLinePos = sSubText.lastIndexOf('\n');
-
-					if (-1 !== iNewLinePos)
-					{
-						iSpacePos = iNewLinePos;
-					}
-
-					if (-1 === iSpacePos)
-					{
-						iSpacePos = iLen;
-					}
-
-					sPrefix += sSubText.substring(0, iSpacePos) + '\n';
-					sResult = sResult.substring(iSpacePos + 1);
-				}
-
-				return sPrefix + sResult;
-			},
-
 			convertBlockquote = function (sText) {
 				sText = Utils.trim(sText);
 				sText = '> ' + sText.replace(/\n/gm, '\n> ');
@@ -886,10 +866,8 @@
 		;
 
 		sText = sHtml
-			// specials for signature
-			.replace(/\u0002\u0002/g, '\u200C\u200C')
-			.replace(/\u0003\u0003/g, '\u200D\u200D')
-
+			.replace(/\u0002([\s\S]*)\u0002/gm, '\u200C$1\u200C')
+			.replace(/<[pP][^>]*><\/[pP]>/g, '')
 			.replace(/<pre[^>]*>([\s\S\r\n]*)<\/pre>/gmi, convertPre)
 			.replace(/[\s]+/gm, ' ')
 			.replace(/((?:href|data)\s?=\s?)("[^"]+?"|'[^']+?')/gmi, fixAttibuteValue)
@@ -920,7 +898,7 @@
 			.replace(/&amp;/gi, '&')
 		;
 
-		sText = splitPlainText(Utils.trim(sText));
+		sText = Utils.splitPlainText(Utils.trim(sText));
 
 		iPos = 0;
 		iLimit = 800;
@@ -1037,16 +1015,12 @@
 		sPlain = aText.join("\n");
 
 		sPlain = sPlain
-
-			// specials for signature
-			.replace(/\u200C\u200C/g, '\u0002\u0002')
-			.replace(/\u200D\u200D/g, '\u0003\u0003')
-
 //			.replace(/~~~\/blockquote~~~\n~~~blockquote~~~/g, '\n')
 			.replace(/&/g, '&amp;')
 			.replace(/>/g, '&gt;').replace(/</g, '&lt;')
 			.replace(/~~~blockquote~~~[\s]*/g, '<blockquote>')
 			.replace(/[\s]*~~~\/blockquote~~~/g, '</blockquote>')
+			.replace(/\u200C([\s\S]*)\u200C/g, '\u0002$1\u0002')
 			.replace(/\n/g, '<br />')
 		;
 
@@ -1062,6 +1036,7 @@
 	 */
 	Utils.findEmailAndLinks = function (sHtml)
 	{
+//		return sHtml;
 		sHtml = Autolinker.link(sHtml, {
 			'newWindow': true,
 			'stripPrefix': false,

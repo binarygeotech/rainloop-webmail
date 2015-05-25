@@ -9,7 +9,6 @@
 
 		Enums = require('Common/Enums'),
 		Consts = require('Common/Consts'),
-		Globals = require('Common/Globals'),
 		Utils = require('Common/Utils'),
 
 		Cache = require('Common/Cache')
@@ -20,6 +19,8 @@
 	 */
 	function FolderUserStore()
 	{
+		this.displaySpecSetting = ko.observable(true);
+
 		this.sentFolder = ko.observable('');
 		this.draftFolder = ko.observable('');
 		this.spamFolder = ko.observable('');
@@ -29,7 +30,6 @@
 		this.namespace = '';
 
 		this.folderList = ko.observableArray([]);
-		this.folderList.focused = ko.observable(false);
 		this.folderList.optimized = ko.observable(false);
 		this.folderList.error = ko.observable('');
 
@@ -180,27 +180,13 @@
 		this.spamFolder.subscribe(fSetSystemFolderType(Enums.FolderType.Spam), this);
 		this.trashFolder.subscribe(fSetSystemFolderType(Enums.FolderType.Trash), this);
 		this.archiveFolder.subscribe(fSetSystemFolderType(Enums.FolderType.Archive), this);
-
-		this.folderList.focused.subscribe(function (bValue) {
-			if (bValue)
-			{
-				Globals.keyScope(Enums.KeyState.FolderList);
-			}
-			else if (Enums.KeyState.FolderList === Globals.keyScope())
-			{
-				Globals.keyScope(Enums.KeyState.MessageList);
-			}
-		});
 	};
 
 	/**
-	 * @param {boolean=} bBoot = false
-	 * @returns {Array}
+	 * @return {Array}
 	 */
-	FolderUserStore.prototype.getNextFolderNames = function (bBoot)
+	FolderUserStore.prototype.getNextFolderNames = function ()
 	{
-		bBoot = Utils.isUnd(bBoot) ? false : !!bBoot;
-
 		var
 			aResult = [],
 			iLimit = 5,
@@ -213,7 +199,8 @@
 					if (oFolder && sInboxFolderName !== oFolder.fullNameRaw &&
 						oFolder.selectable && oFolder.existen &&
 						iTimeout > oFolder.interval &&
-						(!bBoot || oFolder.subScribed()))
+						(oFolder.isSystemFolder() || (oFolder.subScribed() && oFolder.checkable()))
+					)
 					{
 						aTimeouts.push([oFolder.interval, oFolder.fullNameRaw]);
 					}
@@ -249,7 +236,9 @@
 			return iLimit <= aResult.length;
 		});
 
-		return _.uniq(aResult);
+		aResult = _.uniq(aResult);
+
+		return aResult;
 	};
 
 	module.exports = new FolderUserStore();

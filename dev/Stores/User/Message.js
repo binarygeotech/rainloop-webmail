@@ -26,7 +26,8 @@
 
 		Remote = require('Remote/User/Ajax'),
 
-		MessageModel = require('Model/Message')
+		MessageModel = require('Model/Message'),
+		MessageHelper = require('Helper/Message')
 	;
 
 	/**
@@ -40,38 +41,37 @@
 
 		this.messageListCount = ko.observable(0);
 		this.messageListSearch = ko.observable('');
+		this.messageListThreadUid = ko.observable('');
 		this.messageListPage = ko.observable(1);
+		this.messageListPageBeforeThread = ko.observable(1);
 		this.messageListError = ko.observable('');
 
 		this.messageListEndFolder = ko.observable('');
 		this.messageListEndSearch = ko.observable('');
+		this.messageListEndThreadUid = ko.observable('');
 		this.messageListEndPage = ko.observable(1);
 
 		this.messageListLoading = ko.observable(false);
 		this.messageListIsNotCompleted = ko.observable(false);
 		this.messageListCompleteLoadingThrottle = ko.observable(false).extend({'throttle': 200});
+		this.messageListCompleteLoadingThrottleForAnimation = ko.observable(false).extend({'specialThrottle': 700});
 
 		this.messageListDisableAutoSelect = ko.observable(false).extend({'falseTimeout': 500});
-
-		// message viewer
-		this.message = ko.observable(null);
 
 		this.selectorMessageSelected = ko.observable(null);
 		this.selectorMessageFocused = ko.observable(null);
 
-		this.message.focused = ko.observable(false);
+		// message viewer
+		this.message = ko.observable(null);
 
 		this.message.viewTrigger = ko.observable(false);
-
-		this.messageLastThreadUidsData = ko.observable(null);
 
 		this.messageError = ko.observable('');
 
 		this.messageCurrentLoading = ko.observable(false);
-		this.messageThreadLoading = ko.observable(false);
 
 		this.messageLoading = ko.computed(function () {
-			return !!(this.messageCurrentLoading() || this.messageThreadLoading());
+			return this.messageCurrentLoading();
 		}, this);
 
 		this.messageLoadingThrottle = ko.observable(false).extend({'throttle': 50});
@@ -91,8 +91,12 @@
 
 	MessageUserStore.prototype.computers = function ()
 	{
+		var self = this;
+
 		this.messageListEndHash = ko.computed(function () {
-			return this.messageListEndFolder() + '|' + this.messageListEndSearch() + '|' + this.messageListEndPage();
+			return this.messageListEndFolder() + '|' + this.messageListEndSearch() +
+				'|' + this.messageListEndThreadUid() +
+				'|' + this.messageListEndPage();
 		}, this);
 
 		this.messageListPageCount = ko.computed(function () {
@@ -105,7 +109,8 @@
 			'read': this.messageListSearch,
 			'write': function (sValue) {
 				kn.setHash(Links.mailBox(
-					FolderStore.currentFolderFullNameHash(), 1, Utils.trim(sValue.toString())
+					FolderStore.currentFolderFullNameHash(), 1,
+					Utils.trim(sValue.toString()), self.messageListThreadUid()
 				));
 			},
 			'owner': this
@@ -163,7 +168,9 @@
 	MessageUserStore.prototype.subscribers = function ()
 	{
 		this.messageListCompleteLoading.subscribe(function (bValue) {
+			bValue = !!bValue;
 			this.messageListCompleteLoadingThrottle(bValue);
+			this.messageListCompleteLoadingThrottleForAnimation(bValue);
 		}, this);
 
 		this.messageList.subscribe(_.debounce(function (aList) {
@@ -176,41 +183,22 @@
 		}, 500));
 
 		this.message.subscribe(function (oMessage) {
-			if (!oMessage)
+
+			if (oMessage)
 			{
-				this.message.focused(false);
+				 if (Enums.Layout.NoPreview === SettingsStore.layout())
+				{
+					AppStore.focusedState(Enums.Focused.MessageView);
+				}
+			}
+			else
+			{
+				AppStore.focusedState(Enums.Focused.MessageList);
+
 				this.messageFullScreenMode(false);
 				this.hideMessageBodies();
+			}
 
-				if (Enums.Layout.NoPreview === SettingsStore.layout() &&
-					-1 < window.location.hash.indexOf('message-preview'))
-				{
-					require('App/User').historyBack();
-				}
-			}
-			else if (Enums.Layout.NoPreview === SettingsStore.layout())
-			{
-				this.message.focused(true);
-			}
-		}, this);
-
-		this.message.focused.subscribe(function (bValue) {
-			if (bValue)
-			{
-				FolderStore.folderList.focused(false);
-				Globals.keyScope(Enums.KeyState.MessageView);
-			}
-			else if (Enums.KeyState.MessageView === Globals.keyScope())
-			{
-				if (Enums.Layout.NoPreview === SettingsStore.layout() && this.message())
-				{
-					Globals.keyScope(Enums.KeyState.MessageView);
-				}
-				else
-				{
-					Globals.keyScope(Enums.KeyState.MessageList);
-				}
-			}
 		}, this);
 
 		this.messageLoading.subscribe(function (bValue) {
@@ -237,16 +225,16 @@
 	{
 		var
 			iCount = 0,
-			oMessagesBodiesDom = null,
+			oMessagesDom = null,
 			iEnd = Globals.iMessageBodyCacheCount - Consts.Values.MessageBodyCacheLimit
 		;
 
 		if (0 < iEnd)
 		{
-			oMessagesBodiesDom = this.messagesBodiesDom();
-			if (oMessagesBodiesDom)
+			oMessagesDom = this.messagesBodiesDom();
+			if (oMessagesDom)
 			{
-				oMessagesBodiesDom.find('.rl-cache-class').each(function () {
+				oMessagesDom.find('.rl-cache-class').each(function () {
 					var oItem = $(this);
 					if (iEnd > oItem.data('rl-cache-count'))
 					{
@@ -258,7 +246,7 @@
 				if (0 < iCount)
 				{
 					_.delay(function () {
-						oMessagesBodiesDom.find('.rl-cache-purge').remove();
+						oMessagesDom.find('.rl-cache-purge').remove();
 					}, 300);
 				}
 			}
@@ -299,7 +287,8 @@
 					{
 						NotificationStore.displayDesktopNotification(
 							Links.notificationMailIcon(),
-							MessageModel.emailsToLine(MessageModel.initEmailsFromJson(aNewMessages[iIndex].From), false),
+							MessageHelper.emailArrayToString(
+								MessageHelper.emailArrayFromJson(aNewMessages[iIndex].From), false),
 							aNewMessages[iIndex].Subject
 						);
 					}
@@ -312,10 +301,10 @@
 
 	MessageUserStore.prototype.hideMessageBodies = function ()
 	{
-		var oMessagesBodiesDom = this.messagesBodiesDom();
-		if (oMessagesBodiesDom)
+		var oMessagesDom = this.messagesBodiesDom();
+		if (oMessagesDom)
 		{
-			oMessagesBodiesDom.find('.b-text-part').hide();
+			oMessagesDom.find('.b-text-part').hide();
 		}
 	};
 
@@ -338,6 +327,7 @@
 		var
 			self = this,
 			iUnseenCount = 0,
+			oMessage = null,
 			aMessageList = this.messageList(),
 			oFromFolder = Cache.getFolderFromCacheList(sFromFolderFullNameRaw),
 			oToFolder = '' === sToFolderFullNameRaw ? null : Cache.getFolderFromCacheList(sToFolderFullNameRaw || ''),
@@ -417,6 +407,74 @@
 		{
 			Cache.setFolderHash(sToFolderFullNameRaw, '');
 		}
+
+		if ('' !== this.messageListThreadUid())
+		{
+			aMessageList = this.messageList();
+
+			if (aMessageList && 0 < aMessageList.length && !!_.find(aMessageList, function (oMessage) {
+				return !!(oMessage && oMessage.deleted() && oMessage.uid === self.messageListThreadUid());
+			}))
+			{
+				oMessage = _.find(aMessageList, function (oMessage) {
+					return oMessage && !oMessage.deleted();
+				});
+
+				if (oMessage && this.messageListThreadUid() !== Utils.pString(oMessage.uid))
+				{
+					this.messageListThreadUid(Utils.pString(oMessage.uid));
+
+					kn.setHash(Links.mailBox(
+						FolderStore.currentFolderFullNameHash(),
+						this.messageListPage(),
+						this.messageListSearch(),
+						this.messageListThreadUid()
+					), true, true);
+				}
+				else if (!oMessage)
+				{
+					if (1 < this.messageListPage())
+					{
+						this.messageListPage(this.messageListPage() - 1);
+
+						kn.setHash(Links.mailBox(
+							FolderStore.currentFolderFullNameHash(),
+							this.messageListPage(),
+							this.messageListSearch(),
+							this.messageListThreadUid()
+						), true, true);
+					}
+					else
+					{
+						this.messageListThreadUid('');
+
+						kn.setHash(Links.mailBox(
+							FolderStore.currentFolderFullNameHash(),
+							this.messageListPageBeforeThread(),
+							this.messageListSearch()
+						), true, true);
+					}
+				}
+			}
+		}
+	};
+
+	MessageUserStore.prototype.addBlockquoteSwitcherCallback = function ()
+	{
+		var $self = $(this);
+		if ('' !== Utils.trim(($self.text())))
+		{
+			$self.addClass('rl-bq-switcher hidden-bq');
+			$('<span class="rlBlockquoteSwitcher"><i class="icon-ellipsis" /></span>')
+				.insertBefore($self)
+				.on('click.rlBlockquoteSwitcher', function () {
+					$self.toggleClass('hidden-bq');
+					Utils.windowResize();
+				})
+				.after('<br />')
+				.before('<br />')
+			;
+		}
 	};
 
 	/**
@@ -432,19 +490,7 @@
 
 			if ($oList && 0 < $oList.length)
 			{
-				$oList.each(function () {
-					var $self = $(this);
-					$self.addClass('rl-bq-switcher hidden-bq');
-					$('<span class="rlBlockquoteSwitcher"><i class="icon-ellipsis" /></span>')
-						.insertBefore($self)
-						.click(function () {
-							$self.toggleClass('hidden-bq');
-							Utils.windowResize();
-						})
-						.after('<br />')
-						.before('<br />')
-					;
-				});
+				$oList.each(this.addBlockquoteSwitcherCallback);
 			}
 		}
 	};
@@ -462,7 +508,7 @@
 			sResultHtml = '',
 			bPgpSigned = false,
 			bPgpEncrypted = false,
-			oMessagesBodiesDom = this.messagesBodiesDom(),
+			oMessagesDom = this.messagesBodiesDom(),
 			oSelectedMessage = this.selectorMessageSelected(),
 			oMessage = this.message(),
 			aThreads = []
@@ -500,11 +546,12 @@
 					oMessage.initFlagsByJson(oData.Result);
 				}
 
-				oMessagesBodiesDom = oMessagesBodiesDom && oMessagesBodiesDom[0] ? oMessagesBodiesDom : null;
-				if (oMessagesBodiesDom)
+				oMessagesDom = oMessagesDom && oMessagesDom[0] ? oMessagesDom : null;
+				if (oMessagesDom)
 				{
 					sId = 'rl-mgs-' + oMessage.hash.replace(/[^a-zA-Z0-9]/g, '');
-					oTextBody = oMessagesBodiesDom.find('#' + sId);
+					oTextBody = oMessagesDom.find('#' + sId);
+
 					if (!oTextBody || !oTextBody[0])
 					{
 						bHasExternals = !!oData.Result.HasExternals;
@@ -576,10 +623,10 @@
 						oMessage.body = oBody;
 						if (oMessage.body)
 						{
-							oMessagesBodiesDom.append(oMessage.body);
+							oMessagesDom.append(oMessage.body);
 						}
 
-						oMessage.storeDataToDom();
+						oMessage.storeDataInDom();
 
 						if (bHasInternals)
 						{
@@ -599,7 +646,7 @@
 						if (oMessage.body)
 						{
 							oMessage.body.data('rl-cache-count', ++Globals.iMessageBodyCacheCount);
-							oMessage.fetchDataToDom();
+							oMessage.fetchDataFromDom();
 						}
 					}
 
@@ -666,30 +713,10 @@
 			this.message(this.staticMessage.populateByMessageListItem(oMessage));
 
 			this.populateMessageBody(this.message());
-
-			if (Enums.Layout.NoPreview === SettingsStore.layout())
-			{
-				kn.setHash(Links.messagePreview(), true);
-				this.message.focused(true);
-			}
 		}
 		else
 		{
 			this.message(null);
-		}
-	};
-
-	MessageUserStore.prototype.selectThreadMessage = function (sFolder, sUid)
-	{
-		if (Remote.message(this.onMessageResponse, sFolder, sUid))
-		{
-			this.messageThreadLoading(true);
-		}
-
-		if (Enums.Layout.NoPreview === SettingsStore.layout())
-		{
-			kn.setHash(Links.messagePreview(), true);
-			this.message.focused(true);
 		}
 	};
 
@@ -714,7 +741,6 @@
 		this.hideMessageBodies();
 
 		this.messageCurrentLoading(false);
-		this.messageThreadLoading(false);
 
 		if (Enums.StorageResultType.Success === sResult && oData && oData.Result)
 		{
@@ -736,7 +762,7 @@
 
 	/**
 	 * @param {Array} aList
-	 * @returns {string}
+	 * @return {string}
 	 */
 	MessageUserStore.prototype.calculateMessageListHash = function (aList)
 	{
@@ -751,7 +777,6 @@
 			oData.Result['@Collection'] && Utils.isArray(oData.Result['@Collection']))
 		{
 			var
-				self = this,
 				iIndex = 0,
 				iLen = 0,
 				iCount = 0,
@@ -833,9 +858,11 @@
 			this.messageListCount(iCount);
 			this.messageListSearch(Utils.isNormal(oData.Result.Search) ? oData.Result.Search : '');
 			this.messageListPage(window.Math.ceil((iOffset / SettingsStore.messagesPerPage()) + 1));
+			this.messageListThreadUid(Utils.isNormal(oData.Result.ThreadUid) ? Utils.pString(oData.Result.ThreadUid) : '');
 
 			this.messageListEndFolder(Utils.isNormal(oData.Result.Folder) ? oData.Result.Folder : '');
-			this.messageListEndSearch(Utils.isNormal(oData.Result.Search) ? oData.Result.Search : '');
+			this.messageListEndSearch(this.messageListSearch());
+			this.messageListEndThreadUid(this.messageListThreadUid());
 			this.messageListEndPage(this.messageListPage());
 
 			this.messageListDisableAutoSelect(true);
@@ -844,26 +871,6 @@
 			this.messageListIsNotCompleted(false);
 
 			Cache.clearNewMessageCache();
-
-			if (AppStore.threadsAllowed() && SettingsStore.useThreads())
-			{
-				oMessage = this.message();
-				if (oMessage)
-				{
-					Remote.messageThreadsFromCache(function (sResult, oData) {
-
-						if (Enums.StorageResultType.Success === sResult && oData &&  oData.Result && oData.Result.ThreadUids)
-						{
-							self.messageLastThreadUidsData({
-								'Folder': oData.Result.Folder,
-								'Uid': oData.Result.Uid,
-								'Uids': oData.Result.ThreadUids
-							});
-						}
-
-					}, oMessage.folderFullNameRaw, oMessage.uid);
-				}
-			}
 
 			if (oFolder && (bCached || bUnreadCountChange || SettingsStore.useThreads()))
 			{

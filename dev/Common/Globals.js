@@ -18,6 +18,7 @@
 	Globals.$win = $(window);
 	Globals.$doc = $(window.document);
 	Globals.$html = $('html');
+	Globals.$body = $('body');
 	Globals.$div = $('<div></div>');
 
 	Globals.$win.__sizes = [0, 0];
@@ -25,17 +26,17 @@
 	/**
 	 * @type {?}
 	 */
-	Globals.now = (new window.Date()).getTime();
+	Globals.startMicrotime = (new window.Date()).getTime();
+
+	/**
+	 * @type {boolean}
+	 */
+	Globals.community = RL_COMMUNITY;
 
 	/**
 	 * @type {?}
 	 */
 	Globals.dropdownVisibility = ko.observable(false).extend({'rateLimit': 0});
-
-	/**
-	 * @type {?}
-	 */
-	Globals.tooltipTrigger = ko.observable(false).extend({'rateLimit': 0});
 
 	/**
 	 * @type {boolean}
@@ -67,6 +68,21 @@
 	 */
 	Globals.sUserAgent = 'navigator' in window && 'userAgent' in window.navigator &&
 		window.navigator.userAgent.toLowerCase() || '';
+
+	/**
+	 * @type {boolean}
+	 */
+	Globals.bIE = Globals.sUserAgent.indexOf('msie') > -1;
+
+	/**
+	 * @type {boolean}
+	 */
+	Globals.bChrome = Globals.sUserAgent.indexOf('chrome') > -1;
+
+	/**
+	 * @type {boolean}
+	 */
+	Globals.bSafari = !Globals.bChrome && Globals.sUserAgent.indexOf('safari') > -1;
 
 	/**
 	 * @type {boolean}
@@ -192,6 +208,7 @@
 	};
 
 	Globals.leftPanelDisabled = ko.observable(false);
+	Globals.leftPanelType = ko.observable('');
 
 	// popups
 	Globals.popupVisibilityNames = ko.observableArray([]);
@@ -238,7 +255,7 @@
 
 							sTagName = sTagName.toUpperCase();
 							return !(sTagName === 'INPUT' || sTagName === 'SELECT' || sTagName === 'TEXTAREA' ||
-								(oElement && sTagName === 'DIV' && 'editorHtmlArea' === oElement.className && oElement.contentEditable)
+								(oElement && sTagName === 'DIV' && ('editorHtmlArea' === oElement.className || 'true' === '' + oElement.contentEditable))
 							);
 						}
 
@@ -258,14 +275,13 @@
 	});
 
 	Globals.keyScopeReal.subscribe(function (sValue) {
-//		window.console.log(sValue);
+//		window.console.log('keyScope=' + sValue); // DEBUG
 		key.setScope(sValue);
 	});
 
 	Globals.dropdownVisibility.subscribe(function (bValue) {
 		if (bValue)
 		{
-			Globals.tooltipTrigger(!Globals.tooltipTrigger());
 			Globals.keyScope(Enums.KeyState.Menu);
 		}
 		else if (Enums.KeyState.Menu === key.getScope())

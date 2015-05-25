@@ -66,9 +66,11 @@ class Application extends \RainLoop\Config\AbstractConfig
 				'allow_user_background'			=> array(false),
 
 				'language'						=> array('en', 'Language used by default'),
+				'language_admin'				=> array('en', 'Admin Panel interface language'),
 				'allow_languages_on_settings'	=> array(true, 'Allow language selection on settings screen'),
 
 				'allow_additional_accounts'		=> array(true, ''),
+				'allow_additional_identities'	=> array(true, ''),
 
 				'messages_per_page'		=> array(20, ' Number of messages displayed on page by default'),
 
@@ -87,8 +89,15 @@ class Application extends \RainLoop\Config\AbstractConfig
 				'login_desc'		=> array(''),
 				'login_css'			=> array(''),
 				'login_powered'		=> array(true),
-				'user_logo'		=> array(''),
-				'user_css'		=> array('')
+
+				'user_css'			=> array(''),
+				'user_logo'			=> array(''),
+				'user_logo_title'	=> array(''),
+				'user_logo_message'	=> array(''),
+				'user_iframe_message'	=> array(''),
+
+				'welcome_page_url'		=> array(''),
+				'welcome_page_display'	=> array('none')
 			),
 
 			'contacts' => array(
@@ -115,6 +124,7 @@ class Application extends \RainLoop\Config\AbstractConfig
 				'admin_password'			=> array('12345'),
 				'allow_admin_panel'			=> array(true, 'Access settings'),
 				'allow_two_factor_auth'		=> array(false),
+				'force_two_factor_auth'		=> array(false),
 				'allow_universal_login'		=> array(false),
 				'admin_panel_host'			=> array(''),
 				'core_install_access_domain' => array('')
@@ -128,8 +138,20 @@ class Application extends \RainLoop\Config\AbstractConfig
 			),
 
 			'capa' => array(
+				'folders' => array(true),
+				'composer' => array(true),
+				'contacts' => array(true),
+				'settings' => array(true),
+				'help' => array(true),
+				'reload' => array(true),
+				'search' => array(true),
+				'search_adv' => array(true),
 				'filters' => array(true),
-				'templates' => array(true)
+				'x-templates' => array(false),
+				'dangerous_actions' => array(true),
+				'message_actions' => array(true),
+				'messagelist_actions' => array(true),
+				'attachments_actions' => array(true)
 			),
 
 			'login' => array(
@@ -182,6 +204,8 @@ Values:
 				'hide_passwords' => array(true, 'Required for development purposes only.
 Disabling this option is not recommended.'),
 
+				'time_offset' => array(0),
+
 				'filename' => array('log-{date:Y-m-d}.txt',
 					'Log filename.
 For security reasons, some characters are removed from filename.
@@ -212,7 +236,7 @@ Examples:
 
 				'auth_logging' => array(false, 'Enable auth logging in a separate file (for fail2ban)'),
 				'auth_logging_filename' => array('fail2ban/auth-{date:Y-m-d}.txt'),
-				'auth_logging_format' => array('Auth failed: ip={request:ip} user={imap:login} host={imap:host} port={imap:port}')
+				'auth_logging_format' => array('[{date:Y-m-d H:i:s}] Auth failed: ip={request:ip} user={imap:login} host={imap:host} port={imap:port}')
 			),
 
 			'debug' => array(
@@ -278,7 +302,6 @@ Enables caching in the system'),
 				'use_app_debug_js' => array(false),
 				'use_app_debug_css' => array(false),
 				'use_imap_sort' => array(true),
-				'use_imap_esearch_esort' => array(true),
 				'use_imap_force_selection' => array(false),
 				'use_imap_list_subscribe' => array(true),
 				'use_imap_thread' => array(true),
@@ -291,15 +314,19 @@ Enables caching in the system'),
 				'imap_message_list_fast_simple_search' => array(true),
 				'imap_message_list_count_limit_trigger' => array(0),
 				'imap_message_list_date_filter' => array(0),
+				'imap_message_list_permanent_filter' => array(''),
 				'imap_large_thread_limit' => array(50),
 				'imap_folder_list_limit' => array(200),
 				'imap_show_login_alert' => array(true),
 				'smtp_show_server_errors' => array(false),
 				'sieve_allow_raw_script' => array(false),
 				'sieve_utf8_folder_name' => array(true),
+				'mail_func_clear_headers ' => array(true),
+				'mail_func_additional_parameters ' => array(false),
+				'folders_spec_limit' => array(50),
+				'owncloud_save_folder' => array('Attachments'),
 				'curl_proxy' => array(''),
 				'curl_proxy_auth' => array(''),
-				'top_langs' => array('en'),
 				'in_iframe' => array(false),
 				'force_https' => array(false),
 				'custom_login_link' => array(''),
@@ -312,6 +339,7 @@ Enables caching in the system'),
 				'fast_cache_memcache_port' => array(11211),
 				'fast_cache_memcache_expire' => array(43200),
 				'use_local_proxy_for_external_images' => array(false),
+				'startup_url' => array(''),
 				'dev_email' => array(''),
 				'dev_password' => array('')
 			),

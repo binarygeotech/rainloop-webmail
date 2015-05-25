@@ -170,8 +170,6 @@
 							Globals.popupVisibilityNames.push(this.viewModelName);
 							oViewModel.viewModelDom.css('z-index', 3000 + Globals.popupVisibilityNames().length + 10);
 
-//							Utils.delegateRun(this, 'onShow'); // moved to showScreenPopup function (for parameters)
-
 							if (this.onShowTrigger)
 							{
 								this.onShowTrigger(!this.onShowTrigger());
@@ -197,8 +195,6 @@
 
 							Globals.popupVisibilityNames.remove(this.viewModelName);
 							oViewModel.viewModelDom.css('z-index', 2000);
-
-							Globals.tooltipTrigger(!Globals.tooltipTrigger());
 
 							_.delay(function () {
 								self.viewModelDom.hide();
@@ -259,6 +255,8 @@
 
 			if (ViewModelClassToShow.__vm && ViewModelClassToShow.__dom)
 			{
+				Utils.delegateRun(ViewModelClassToShow.__vm, 'onBeforeShow', aParameters || []);
+
 				ViewModelClassToShow.__vm.modalVisibility(true);
 
 				Utils.delegateRun(ViewModelClassToShow.__vm, 'onShow', aParameters || []);
@@ -288,6 +286,7 @@
 		var
 			self = this,
 			oScreen = null,
+			bSameScreen= false,
 			oCross = null
 		;
 
@@ -311,6 +310,8 @@
 
 			if (oScreen && oScreen.__started)
 			{
+				bSameScreen = this.oCurrentScreen && oScreen === this.oCurrentScreen;
+
 				if (!oScreen.__builded)
 				{
 					oScreen.__builded = true;
@@ -328,7 +329,7 @@
 				_.defer(function () {
 
 					// hide screen
-					if (self.oCurrentScreen)
+					if (self.oCurrentScreen && !bSameScreen)
 					{
 						Utils.delegateRun(self.oCurrentScreen, 'onHide');
 						Utils.delegateRun(self.oCurrentScreen, 'onHideWithDelay', [], 500);
@@ -365,7 +366,7 @@
 					self.oCurrentScreen = oScreen;
 
 					// show screen
-					if (self.oCurrentScreen)
+					if (self.oCurrentScreen && !bSameScreen)
 					{
 						Utils.delegateRun(self.oCurrentScreen, 'onShow');
 						if (self.oCurrentScreen.onShowTrigger)
@@ -382,6 +383,8 @@
 								if (ViewModelClass.__vm && ViewModelClass.__dom &&
 									'Popups' !== ViewModelClass.__vm.viewModelPosition())
 								{
+									Utils.delegateRun(ViewModelClass.__vm, 'onBeforeShow');
+
 									ViewModelClass.__dom.show();
 									ViewModelClass.__vm.viewModelVisibility(true);
 
@@ -424,19 +427,22 @@
 
 		_.each(aScreensClasses, function (CScreen) {
 
-				var
-					oScreen = new CScreen(),
-					sScreenName = oScreen ? oScreen.screenName() : ''
-				;
-
-				if (oScreen && '' !== sScreenName)
+				if (CScreen)
 				{
-					if ('' === this.sDefaultScreenName)
-					{
-						this.sDefaultScreenName = sScreenName;
-					}
+					var
+						oScreen = new CScreen(),
+						sScreenName = oScreen ? oScreen.screenName() : ''
+					;
 
-					this.oScreens[sScreenName] = oScreen;
+					if (oScreen && '' !== sScreenName)
+					{
+						if ('' === this.sDefaultScreenName)
+						{
+							this.sDefaultScreenName = sScreenName;
+						}
+
+						this.oScreens[sScreenName] = oScreen;
+					}
 				}
 
 			}, this);

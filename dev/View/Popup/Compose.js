@@ -1,4 +1,6 @@
 
+/* global require, module */
+
 (function () {
 
 	'use strict';
@@ -87,6 +89,7 @@
 		this.resizerTrigger = _.bind(this.resizerTrigger, this);
 
 		this.allowContacts = !!AppStore.contactsIsAllowed();
+		this.allowFolders = !!Settings.capa(Enums.Capa.Folders);
 
 		this.bSkipNextHide = false;
 		this.composeInEdit = AppStore.composeInEdit;
@@ -131,12 +134,61 @@
 		this.sendSuccessButSaveError = ko.observable(false);
 		this.savedError = ko.observable(false);
 
+		this.sendErrorDesc = ko.observable('');
+		this.savedErrorDesc = ko.observable('');
+
+		this.sendError.subscribe(function (bValue) {
+			if (!bValue)
+			{
+				this.sendErrorDesc('');
+			}
+		}, this);
+
+		this.savedError.subscribe(function (bValue) {
+			if (!bValue)
+			{
+				this.savedErrorDesc('');
+			}
+		}, this);
+
+		this.sendSuccessButSaveError.subscribe(function (bValue) {
+			if (!bValue)
+			{
+				this.savedErrorDesc('');
+			}
+		}, this);
+
 		this.savedTime = ko.observable(0);
-		this.savedOrSendingText = ko.observable('');
+		this.savedTimeText = ko.computed(function () {
+			return 0 < this.savedTime() ? Translator.i18n('COMPOSE/SAVED_TIME', {
+				'TIME': Momentor.format(this.savedTime() - 1, 'LT')
+			}) : '';
+		}, this);
 
 		this.emptyToError = ko.observable(false);
+		this.emptyToErrorTooltip = ko.computed(function () {
+			return this.emptyToError() ? Translator.i18n('COMPOSE/EMPTY_TO_ERROR_DESC') : '';
+		}, this);
+
 		this.attachmentsInProcessError = ko.observable(false);
 		this.attachmentsInErrorError = ko.observable(false);
+
+		this.attachmentsErrorTooltip = ko.computed(function () {
+
+			var sResult = '';
+			switch (true)
+			{
+				case this.attachmentsInProcessError():
+					sResult = Translator.i18n('COMPOSE/ATTACHMENTS_UPLOAD_ERROR_DESC');
+					break;
+				case this.attachmentsInErrorError():
+					sResult = Translator.i18n('COMPOSE/ATTACHMENTS_ERROR_DESC');
+					break;
+			}
+
+			return sResult;
+
+		}, this);
 
 		this.showCc = ko.observable(false);
 		this.showBcc = ko.observable(false);
@@ -270,7 +322,7 @@
 			}
 		}, this));
 
-		this.canBeSendedOrSaved = ko.computed(function () {
+		this.canBeSentOrSaved = ko.computed(function () {
 			return !this.sending() && !this.saving();
 		}, this);
 
@@ -294,6 +346,10 @@
 				aFlagsCache = []
 			;
 
+			this.attachmentsInProcessError(false);
+			this.attachmentsInErrorError(false);
+			this.emptyToError(false);
+
 			if (0 < this.attachmentsInProcess().length)
 			{
 				this.attachmentsInProcessError(true);
@@ -304,11 +360,13 @@
 				this.attachmentsInErrorError(true);
 				this.attachmentsPlace(true);
 			}
-			else if (0 === sTo.length)
+
+			if (0 === sTo.length)
 			{
 				this.emptyToError(true);
 			}
-			else
+
+			if (!this.emptyToError() && !this.attachmentsInErrorError() && !this.attachmentsInProcessError())
 			{
 				if (SettingsStore.replySameFolder())
 				{
@@ -316,6 +374,11 @@
 					{
 						sSentFolder = this.aDraftInfo[2];
 					}
+				}
+
+				if (!this.allowFolders)
+				{
+					sSentFolder = Consts.Values.UnuseOptionValue;
 				}
 
 				if ('' === sSentFolder)
@@ -375,9 +438,15 @@
 					);
 				}
 			}
-		}, this.canBeSendedOrSaved);
+
+		}, this.canBeSentOrSaved);
 
 		this.saveCommand = Utils.createCommand(this, function () {
+
+			if (!this.allowFolders)
+			{
+				return false;
+			}
 
 			if (FolderStore.draftFolderNotEnabled())
 			{
@@ -413,7 +482,7 @@
 				);
 			}
 
-		}, this.canBeSendedOrSaved);
+		}, this.canBeSentOrSaved);
 
 		this.skipCommand = Utils.createCommand(this, function () {
 
@@ -427,7 +496,7 @@
 
 			this.tryToClosePopup();
 
-		}, this.canBeSendedOrSaved);
+		}, this.canBeSentOrSaved);
 
 		this.contactsCommand = Utils.createCommand(this, function () {
 
@@ -468,7 +537,6 @@
 			if (window.Dropbox)
 			{
 				window.Dropbox.choose({
-					//'iframe': true,
 					'success': function(aFiles) {
 
 						if (aFiles && aFiles[0] && aFiles[0]['link'])
@@ -476,7 +544,7 @@
 							self.addDropboxAttachment(aFiles[0]);
 						}
 					},
-					'linkType': "direct",
+					'linkType': 'direct',
 					'multiselect': false
 				});
 			}
@@ -579,7 +647,7 @@
 			sDraftFolder = FolderStore.draftFolder()
 		;
 
-		if ('' !== sDraftFolder)
+		if ('' !== sDraftFolder && Consts.Values.UnuseOptionValue !== sDraftFolder)
 		{
 			Cache.setFolderHash(sDraftFolder, '');
 			if (FolderStore.currentFolderFullNameRaw() === sDraftFolder)
@@ -597,27 +665,25 @@
 	{
 		var
 			aIdentities = IdentityStore.identities(),
+			iResultIndex = 1000,
 			oResultIdentity = null,
 			oIdentitiesCache = {},
 
-			fFindHelper = function (oItem) {
-				if (oResultIdentity)
-				{
-					return true;
-				}
+			fEachHelper = function (oItem) {
 
-				if (!oResultIdentity && oItem && oItem.email && oIdentitiesCache[oItem.email])
+				if (oItem && oItem.email && oIdentitiesCache[oItem.email])
 				{
-					oResultIdentity = oIdentitiesCache[oItem.email];
-					return true;
+					if (!oResultIdentity || iResultIndex > oIdentitiesCache[oItem.email][1])
+					{
+						oResultIdentity = oIdentitiesCache[oItem.email][0];
+						iResultIndex = oIdentitiesCache[oItem.email][1];
+					}
 				}
-
-				return false;
 			}
 		;
 
-		_.each(aIdentities, function (oItem) {
-			oIdentitiesCache[oItem.email()] = oItem;
+		_.each(aIdentities, function (oItem, iIndex) {
+			oIdentitiesCache[oItem.email()] = [oItem, iIndex];
 		});
 
 		if (oMessage)
@@ -630,10 +696,10 @@
 				case Enums.ComposeType.ReplyAll:
 				case Enums.ComposeType.Forward:
 				case Enums.ComposeType.ForwardAsAttachment:
-					_.find(_.union(oMessage.to, oMessage.cc, oMessage.bcc, oMessage.deliveredTo), fFindHelper);
+					_.each(_.union(oMessage.to, oMessage.cc, oMessage.bcc, oMessage.deliveredTo), fEachHelper);
 					break;
 				case Enums.ComposeType.Draft:
-					_.find(_.union(oMessage.from, oMessage.replyTo), fFindHelper);
+					_.each(_.union(oMessage.from, oMessage.replyTo), fEachHelper);
 					break;
 			}
 		}
@@ -673,7 +739,7 @@
 			if (oData && Enums.Notification.CantSaveMessage === oData.ErrorCode)
 			{
 				this.sendSuccessButSaveError(true);
-				window.alert(Utils.trim(Translator.i18n('COMPOSE/SAVED_ERROR_ON_SEND')));
+				this.savedErrorDesc(Utils.trim(Translator.i18n('COMPOSE/SAVED_ERROR_ON_SEND')));
 			}
 			else
 			{
@@ -681,7 +747,7 @@
 					oData && oData.ErrorMessage ? oData.ErrorMessage : '');
 
 				this.sendError(true);
-				window.alert(sMessage || Translator.getNotification(Enums.Notification.CantSendMessage));
+				this.sendErrorDesc(sMessage || Translator.getNotification(Enums.Notification.CantSendMessage));
 			}
 		}
 
@@ -717,12 +783,6 @@
 
 				this.savedTime(window.Math.round((new window.Date()).getTime() / 1000));
 
-				this.savedOrSendingText(
-					0 < this.savedTime() ? Translator.i18n('COMPOSE/SAVED_TIME', {
-						'TIME': Momentor.format(this.savedTime() - 1, 'LT')
-					}) : ''
-				);
-
 				if (this.bFromDraft)
 				{
 					Cache.setFolderHash(this.draftFolder(), '');
@@ -733,7 +793,7 @@
 		if (!bResult)
 		{
 			this.savedError(true);
-			this.savedOrSendingText(Translator.getNotification(Enums.Notification.CantSaveMessage));
+			this.savedErrorDesc(Translator.getNotification(Enums.Notification.CantSaveMessage));
 		}
 
 		this.reloadDraftFolder();
@@ -751,6 +811,8 @@
 
 		this.bSkipNextHide = false;
 
+		this.to.focused(false);
+
 		kn.routeOn();
 	};
 
@@ -761,12 +823,14 @@
 			var self = this;
 			if (!this.oEditor && this.composeEditorArea())
 			{
+//_.delay(function () {
 				self.oEditor = new HtmlEditor(self.composeEditorArea(), null, function () {
 					fOnInit(self.oEditor);
 					self.resizerTrigger();
 				}, function (bHtml) {
 					self.isHtml(!!bHtml);
 				});
+//}, 1000);
 			}
 			else if (this.oEditor)
 			{
@@ -944,7 +1008,7 @@
 	 *
 	 * @param {Array} aList
 	 * @param {boolean} bFriendly
-	 * @returns {string}
+	 * @return {string}
 	 */
 	ComposePopupView.prototype.emailArrayToStringLineHelper = function (aList, bFriendly)
 	{
@@ -1042,16 +1106,32 @@
 			oText = $(oMessage.body).clone();
 			if (oText)
 			{
-				oText.find('blockquote.rl-bq-switcher').each(function () {
-					$(this).removeClass('rl-bq-switcher hidden-bq');
-				});
-				oText.find('.rlBlockquoteSwitcher').each(function () {
-					$(this).remove();
-				});
-			}
+				oText.find('blockquote.rl-bq-switcher').removeClass('rl-bq-switcher hidden-bq');
+				oText.find('.rlBlockquoteSwitcher').off('.rlBlockquoteSwitcher').remove();
+				oText.find('[data-html-editor-font-wrapper]').removeAttr('data-html-editor-font-wrapper');
 
-			oText.find('[data-html-editor-font-wrapper]').removeAttr('data-html-editor-font-wrapper');
-			sText = oText.html();
+//				(function () {
+//
+//					var oTmp = null, iLimit = 0;
+//
+//					while (true)
+//					{
+//						iLimit++;
+//
+//						oTmp = oText.children();
+//						if (10 > iLimit && oTmp.is('div') && 1 === oTmp.length)
+//						{
+//							oTmp.children().unwrap();
+//							continue;
+//						}
+//
+//						break;
+//					}
+//
+//				}());
+
+				sText = oText.html();
+			}
 
 			switch (sComposeType)
 			{
@@ -1139,7 +1219,8 @@
 					});
 
 					sText = '<br /><br />' + sReplyTitle + ':' +
-						'<blockquote><p>' + Utils.trim(sText) + '</p></blockquote>';
+						'<blockquote>' + Utils.trim(sText) + '</blockquote>';
+//						'<blockquote><p>' + Utils.trim(sText) + '</p></blockquote>';
 
 					break;
 
@@ -1155,6 +1236,7 @@
 							'<br />' + Translator.i18n('COMPOSE/FORWARD_MESSAGE_TOP_SUBJECT') + ': ' + Utils.encodeHtml(sSubject) +
 							'<br /><br />' + Utils.trim(sText) + '<br /><br />';
 					break;
+
 				case Enums.ComposeType.ForwardAsAttachment:
 					sText = '';
 					break;
@@ -1226,6 +1308,10 @@
 				self.setFocusInPopup();
 			});
 		}
+		else
+		{
+			this.setFocusInPopup();
+		}
 
 		aDownloads = this.getAttachmentsDownloadsForUpload();
 		if (Utils.isNonEmptyArray(aDownloads))
@@ -1276,21 +1362,27 @@
 	{
 		if (!Globals.bMobileDevice)
 		{
-			if ('' === this.to())
-			{
-				this.to.focused(false);
-				this.to.focused(true);
-			}
-			else if (this.oEditor)
-			{
-				this.oEditor.focus();
-			}
+			var self = this;
+			_.delay(function () {
+
+				if ('' === self.to())
+				{
+					self.to.focused(true);
+				}
+				else if (self.oEditor)
+				{
+					if (!self.to.focused())
+					{
+						self.oEditor.focus();
+					}
+				}
+
+			}, 100);
 		}
 	};
 
 	ComposePopupView.prototype.onShowWithDelay = function ()
 	{
-		this.setFocusInPopup();
 		this.resizerTrigger();
 	};
 
@@ -1333,10 +1425,13 @@
 			return false;
 		});
 
-		key('ctrl+s, command+s', Enums.KeyState.Compose, function () {
-			self.saveCommand();
-			return false;
-		});
+		if (this.allowFolders)
+		{
+			key('ctrl+s, command+s', Enums.KeyState.Compose, function () {
+				self.saveCommand();
+				return false;
+			});
+		}
 
 		if (!!Settings.settingsGet('AllowCtrlEnterOnCompose'))
 		{
@@ -1357,11 +1452,11 @@
 		Events.sub('window.resize.real', this.resizerTrigger);
 		Events.sub('window.resize.real', _.debounce(this.resizerTrigger, 50));
 
-		if (this.dropboxEnabled())
+		if (this.dropboxEnabled() && this.dropboxApiKey() && !window.Dropbox)
 		{
 			oScript = window.document.createElement('script');
 			oScript.type = 'text/javascript';
-			oScript.src = 'https://www.dropbox.com/static/api/1/dropins.js';
+			oScript.src = 'https://www.dropbox.com/static/api/2/dropins.js';
 			$(oScript).attr('id', 'dropboxjs').attr('data-app-key', self.dropboxApiKey());
 
 			window.document.body.appendChild(oScript);
@@ -1590,7 +1685,6 @@
 					'name': 'uploader',
 					'queueSize': 2,
 					'multipleSizeLimit': 50,
-					'disableFolderDragAndDrop': false,
 					'clickElement': this.composeUploaderButton(),
 					'dragAndDropElement': this.composeUploaderDropPlace()
 				})
@@ -1609,6 +1703,7 @@
 						this.dragAndDropOver(false);
 					}, this))
 					.on('onBodyDragEnter', _.bind(function () {
+						this.attachmentsPlace(true);
 						this.dragAndDropVisible(true);
 					}, this))
 					.on('onBodyDragLeave', _.bind(function () {
@@ -2044,7 +2139,6 @@
 		this.sendSuccessButSaveError(false);
 		this.savedError(false);
 		this.savedTime(0);
-		this.savedOrSendingText('');
 		this.emptyToError(false);
 		this.attachmentsInProcessError(false);
 

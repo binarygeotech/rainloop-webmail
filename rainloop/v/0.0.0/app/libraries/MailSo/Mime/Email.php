@@ -58,9 +58,11 @@ class Email
 			throw new \MailSo\Base\Exceptions\InvalidArgumentException();
 		}
 
-		$this->sEmail = \MailSo\Base\Utils::IdnToAscii(\trim($sEmail), true);
-		$this->sDisplayName = \trim($sDisplayName);
-		$this->sRemark = \trim($sRemark);
+		$this->sEmail = \MailSo\Base\Utils::IdnToAscii(
+			\MailSo\Base\Utils::Trim($sEmail), true);
+
+		$this->sDisplayName = \MailSo\Base\Utils::Trim($sDisplayName);
+		$this->sRemark = \MailSo\Base\Utils::Trim($sRemark);
 
 		$this->sDkimStatus = \MailSo\Mime\Enumerations\DkimStatus::NONE;
 		$this->sDkimValue = '';
@@ -88,6 +90,7 @@ class Email
 	 */
 	public static function Parse($sEmailAddress)
 	{
+		$sEmailAddress = \MailSo\Base\Utils::Trim($sEmailAddress);
 		if (!\MailSo\Base\Validator::NotEmptyString($sEmailAddress, true))
 		{
 			throw new \MailSo\Base\Exceptions\InvalidArgumentException();
@@ -198,6 +201,8 @@ class Email
 		}
 
 		$sEmail = \trim(\trim($sEmail), '<>');
+		$sEmail = \rtrim(\trim($sEmail), '.');
+		$sEmail = \trim($sEmail);
 
 		$sName = \trim(\trim($sName), '"');
 		$sName = \trim($sName, '\'');

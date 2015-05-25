@@ -5,70 +5,132 @@
 
 	var
 		_ = require('_'),
+		ko = require('ko'),
 
 		Utils = require('Common/Utils'),
 
-		MessageModel = require('Model/Message'),
+		MessageHelper = require('Helper/Message'),
 
 		AbstractModel = require('Knoin/AbstractModel')
 	;
 
 	/**
+	 * @param {string=} sSuperName
 	 * @constructor
 	 */
-	function MessageSimpleModel()
+	function MessageSimpleModel(sSuperName)
 	{
-		AbstractModel.call(this, 'MessageSimpleModel');
+		AbstractModel.call(this, sSuperName || 'MessageSimpleModel');
 
-		this.clear();
+		this.flagged = ko.observable(false);
+		this.selected = ko.observable(false);
 	}
 
 	_.extend(MessageSimpleModel.prototype, AbstractModel.prototype);
 
-	MessageSimpleModel.prototype.selected = false;
+	MessageSimpleModel.prototype.__simple_message__ = true;
+
+	MessageSimpleModel.prototype.folder = '';
 	MessageSimpleModel.prototype.folderFullNameRaw = '';
+
 	MessageSimpleModel.prototype.uid = '';
-	MessageSimpleModel.prototype.size = 0;
-	MessageSimpleModel.prototype.sender = '';
 	MessageSimpleModel.prototype.subject = '';
-	MessageSimpleModel.prototype.dateInUTC = 0;
+
+	MessageSimpleModel.prototype.to = [];
+	MessageSimpleModel.prototype.from = [];
+	MessageSimpleModel.prototype.cc = [];
+	MessageSimpleModel.prototype.bcc = [];
+	MessageSimpleModel.prototype.replyTo = [];
+	MessageSimpleModel.prototype.deliveredTo = [];
+
+	MessageSimpleModel.prototype.fromAsString = '';
+	MessageSimpleModel.prototype.fromAsStringClear = '';
+	MessageSimpleModel.prototype.toAsString = '';
+	MessageSimpleModel.prototype.toAsStringClear = '';
+	MessageSimpleModel.prototype.senderAsString = '';
+	MessageSimpleModel.prototype.senderAsStringClear = '';
+
+	MessageSimpleModel.prototype.size = 0;
+	MessageSimpleModel.prototype.timestamp = 0;
 
 	MessageSimpleModel.prototype.clear = function ()
 	{
-		this.selected = false;
-
+		this.folder = '';
 		this.folderFullNameRaw = '';
-		this.uid = '';
-		this.size = 0;
 
-		this.sender = '';
+		this.uid = '';
+
 		this.subject = '';
 
-		this.dateInUTC = 0;
+		this.to = [];
+		this.from = [];
+		this.cc = [];
+		this.bcc = [];
+		this.replyTo = [];
+		this.deliveredTo = [];
+
+		this.fromAsString = '';
+		this.fromAsStringClear = '';
+		this.toAsString = '';
+		this.toAsStringClear = '';
+		this.senderAsString = '';
+		this.senderAsStringClear = '';
+
+		this.size = 0;
+		this.timestamp = 0;
+
+		this.flagged(false);
+		this.selected(false);
 	};
 
 	/**
-	 * @param {AjaxJsonMessage} oJsonMessage
+	 * @param {Object} oJson
 	 * @return {boolean}
 	 */
-	MessageSimpleModel.prototype.initByJson = function (oJsonMessage)
+	MessageSimpleModel.prototype.initByJson = function (oJson)
 	{
 		var bResult = false;
 
-		if (oJsonMessage && 'Object/Message' === oJsonMessage['@Object'])
+		if (oJson && 'Object/Message' === oJson['@Object'])
 		{
-			this.selected = false;
+			this.folder = Utils.pString(oJson.Folder);
+			this.folderFullNameRaw = this.folder;
 
-			this.folderFullNameRaw = oJsonMessage.Folder;
-			this.uid = oJsonMessage.Uid;
-			this.size = Utils.pInt(oJsonMessage.Size);
+			this.uid = Utils.pString(oJson.Uid);
 
-			this.sender = MessageModel.emailsToLine(
-				MessageModel.initEmailsFromJson(oJsonMessage.From), true);
+			this.subject = Utils.pString(oJson.Subject);
 
-			this.subject = oJsonMessage.Subject;
+			if (Utils.isArray(oJson.SubjectParts))
+			{
+				this.subjectPrefix = Utils.pString(oJson.SubjectParts[0]);
+				this.subjectSuffix = Utils.pString(oJson.SubjectParts[1]);
+			}
+			else
+			{
+				this.subjectPrefix = '';
+				this.subjectSuffix = this.subject;
+			}
 
-			this.dateInUTC = Utils.pInt(oJsonMessage.DateTimeStampInUTC);
+			this.from = MessageHelper.emailArrayFromJson(oJson.From);
+			this.to = MessageHelper.emailArrayFromJson(oJson.To);
+			this.cc = MessageHelper.emailArrayFromJson(oJson.Cc);
+			this.bcc = MessageHelper.emailArrayFromJson(oJson.Bcc);
+			this.replyTo = MessageHelper.emailArrayFromJson(oJson.ReplyTo);
+			this.deliveredTo = MessageHelper.emailArrayFromJson(oJson.DeliveredTo);
+
+			this.size = Utils.pInt(oJson.Size);
+			this.timestamp = Utils.pInt(oJson.DateTimeStampInUTC);
+
+			this.fromAsString = MessageHelper.emailArrayToString(this.from, true);
+			this.fromAsStringClear = MessageHelper.emailArrayToStringClear(this.from);
+
+			this.toAsString = MessageHelper.emailArrayToString(this.to, true);
+			this.toAsStringClear = MessageHelper.emailArrayToStringClear(this.to);
+
+			this.flagged(false);
+			this.selected(false);
+
+			this.populateSenderEmail();
 
 			bResult = true;
 		}
@@ -76,15 +138,35 @@
 		return bResult;
 	};
 
+	MessageSimpleModel.prototype.populateSenderEmail = function (bDraftOrSentFolder)
+	{
+		this.senderAsString = this.fromAsString;
+		this.senderAsStringClear = this.fromAsStringClear;
+
+		if (bDraftOrSentFolder)
+		{
+			this.senderAsString = this.toAsString;
+			this.senderAsStringClear = this.toAsStringClear;
+		}
+	};
+
+	/**
+	 * @return {Array}
+	 */
+	MessageSimpleModel.prototype.threads = function ()
+	{
+		return [];
+	};
+
 	/**
 	 * @static
-	 * @param {AjaxJsonMessage} oJsonMessage
+	 * @param {Object} oJson
 	 * @return {?MessageSimpleModel}
 	 */
-	MessageSimpleModel.newInstanceFromJson = function (oJsonMessage)
+	MessageSimpleModel.newInstanceFromJson = function (oJson)
 	{
-		var oMessageModel = new MessageSimpleModel();
-		return oMessageModel.initByJson(oJsonMessage) ? oMessageModel : null;
+		var oItem = oJson ? new MessageSimpleModel() : null;
+		return oItem && oItem.initByJson(oJson) ? oItem : null;
 	};
 
 	module.exports = MessageSimpleModel;

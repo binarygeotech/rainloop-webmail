@@ -6,8 +6,11 @@
 	var
 		ko = require('ko'),
 
+		Translator = require('Common/Translator'),
+
 		Settings = require('Storage/Settings'),
-		CoreStore = require('Stores/Admin/Core')
+		CoreStore = require('Stores/Admin/Core'),
+		AppStore = require('Stores/Admin/App')
 	;
 
 	/**
@@ -31,6 +34,13 @@
 		this.coreRemoteVersion = CoreStore.coreRemoteVersion;
 		this.coreRemoteRelease = CoreStore.coreRemoteRelease;
 		this.coreVersionCompare = CoreStore.coreVersionCompare;
+
+		this.community = RL_COMMUNITY || AppStore.community();
+
+		this.coreRemoteVersionHtmlDesc = ko.computed(function () {
+			Translator.trigger();
+			return Translator.i18n('TAB_ABOUT/HTML_NEW_VERSION', {'VERSION': this.coreRemoteVersion()});
+		}, this);
 
 		this.statusType = ko.computed(function () {
 
@@ -71,7 +81,7 @@
 
 	AboutAdminSettings.prototype.onBuild = function ()
 	{
-		if (this.access())
+		if (this.access() && !this.community)
 		{
 			require('App/Admin').reloadCoreData();
 		}
@@ -79,7 +89,7 @@
 
 	AboutAdminSettings.prototype.updateCoreData = function ()
 	{
-		if (!this.coreUpdating())
+		if (!this.coreUpdating() && !this.community)
 		{
 			require('App/Admin').updateCoreData();
 		}

@@ -8,11 +8,42 @@
 	/**
 	 * @enum {string}
 	 */
+	Enums.FileType = {
+		'Unknown': 'unknown',
+		'Text': 'text',
+		'Html': 'html',
+		'Code': 'code',
+		'Eml': 'eml',
+		'WordText': 'word-text',
+		'Pdf': 'pdf',
+		'Image': 'image',
+		'Audio': 'audio',
+		'Video': 'video',
+		'Sheet': 'sheet',
+		'Presentation': 'presentation',
+		'Certificate': 'certificate',
+		'CertificateBin': 'certificate-bin',
+		'Archive': 'archive'
+	};
+
+	/**
+	 * @enum {string}
+	 */
 	Enums.StorageResultType = {
 		'Success': 'success',
 		'Abort': 'abort',
 		'Error': 'error',
 		'Unload': 'unload'
+	};
+
+	/**
+	 * @enum {string}
+	 */
+	Enums.Focused = {
+		'None': 'none',
+		'MessageList': 'message-list',
+		'MessageView': 'message-view',
+		'FolderList': 'folder-list'
 	};
 
 	/**
@@ -37,9 +68,22 @@
 	 */
 	Enums.Capa = {
 		'TwoFactor': 'TWO_FACTOR',
+		'TwoFactorForce': 'TWO_FACTOR_FORCE',
 		'OpenPGP': 'OPEN_PGP',
 		'Prefetch': 'PREFETCH',
 		'Gravatar': 'GRAVATAR',
+		'Folders': 'FOLDERS',
+		'Composer': 'COMPOSER',
+		'Contacts': 'CONTACTS',
+		'Reload': 'RELOAD',
+		'Search': 'SEARCH',
+		'SearchAdv': 'SEARCH_ADV',
+		'MessageActions': 'MESSAGE_ACTIONS',
+		'MessageListActions': 'MESSAGELIST_ACTIONS',
+		'AttachmentsActions': 'ATTACHMENTS_ACTIONS',
+		'DangerousActions': 'DANGEROUS_ACTIONS',
+		'Settings': 'SETTINGS',
+		'Help': 'HELP',
 		'Themes': 'THEMES',
 		'UserBackground': 'USER_BACKGROUND',
 		'Sieve': 'SIEVE',
@@ -47,7 +91,8 @@
 		'AttachmentThumbnails': 'ATTACHMENT_THUMBNAILS',
 		'Templates': 'TEMPLATES',
 		'AutoLogout': 'AUTOLOGOUT',
-		'AdditionalAccounts': 'ADDITIONAL_ACCOUNTS'
+		'AdditionalAccounts': 'ADDITIONAL_ACCOUNTS',
+		'Identities': 'IDENTITIES'
 	};
 
 	/**
@@ -80,6 +125,21 @@
 		'Archive': 15,
 		'NotSpam': 80,
 		'User': 99
+	};
+
+	/**
+	 * @enum {number}
+	 */
+	Enums.ServerFolderType = {
+		'USER': 0,
+		'INBOX': 1,
+		'SENT': 2,
+		'DRAFTS': 3,
+		'JUNK': 4,
+		'TRASH': 5,
+		'IMPORTANT': 10,
+		'FLAGGED': 11,
+		'ALL': 12
 	};
 
 	/**
@@ -274,7 +334,9 @@
 	Enums.FilterConditionField = {
 		'From': 'From',
 		'Recipient': 'Recipient',
-		'Subject': 'Subject'
+		'Subject': 'Subject',
+		'Header': 'Header',
+		'Size': 'Size'
 	};
 
 	/**
@@ -284,7 +346,9 @@
 		'Contains': 'Contains',
 		'NotContains': 'NotContains',
 		'EqualTo': 'EqualTo',
-		'NotEqualTo': 'NotEqualTo'
+		'NotEqualTo': 'NotEqualTo',
+		'Over': 'Over',
+		'Under': 'Under'
 	};
 
 	/**

@@ -16,7 +16,8 @@ It's not recommended to use in production environment.
 
 ## License
 
-**Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported (CC BY-NC-SA 3.0)**
-http://creativecommons.org/licenses/by-nc-sa/3.0/
+**RainLoop Webmail (Community edition)** is released under
+**GNU AFFERO GENERAL PUBLIC LICENSE Version 3 (AGPL)**.
+http://www.gnu.org/licenses/agpl-3.0.html
 
 Copyright (c) 2015 Rainloop Team

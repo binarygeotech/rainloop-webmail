@@ -236,6 +236,56 @@ END;
 	}
 
 	/**
+	 * @param string $sFilePath
+	 * @param function $fFileExistsCallback = null
+	 *
+	 * @return string
+	 */
+	public static function SmartFileExists($sFilePath, $fFileExistsCallback = null)
+	{
+		$sFilePath = \str_replace('\\', '/', \trim($sFilePath));
+		if (!$fFileExistsCallback)
+		{
+			$fFileExistsCallback = function ($sPath) {
+				return \file_exists($sPath);
+			};
+		}
+
+		if (!\call_user_func($fFileExistsCallback, $sFilePath))
+		{
+			return $sFilePath;
+		}
+
+		$aFileInfo = \pathinfo($sFilePath);
+
+		$iIndex = 0;
+
+		do
+		{
+			$iIndex++;
+
+			$sFilePathNew = $aFileInfo['dirname'].'/'.
+				\preg_replace('/\(\d{1,2}\)$/', '', $aFileInfo['filename']).
+				' ('.$iIndex.')'.
+				(empty($aFileInfo['extension']) ? '' : '.'.$aFileInfo['extension'])
+			;
+
+			if (!\call_user_func($fFileExistsCallback, $sFilePathNew))
+			{
+				$sFilePath = $sFilePathNew;
+				break;
+			}
+			else if (10 < $iIndex)
+			{
+				break;
+			}
+		}
+		while (true);
+
+		return $sFilePath;
+	}
+
+	/**
 	 * @return bool
 	 */
 	public static function IsMbStringSupported()
@@ -552,6 +602,16 @@ END;
 	}
 
 	/**
+	 * @param string $sInputValue
+	 *
+	 * @return string
+	 */
+	public static function DecodeFlowedFormat($sInputValue)
+	{
+		return \preg_replace('/ ([\r]?[\n])/m', ' ', $sInputValue);
+	}
+
+	/**
 	 * @param string $sEncodedValue
 	 * @param string $sIncomingCharset = ''
 	 * @param string $sForcedIncomingCharset = ''
@@ -668,6 +728,64 @@ END;
 		}
 
 		return $sValue;
+	}
+
+	/**
+	 * @param string $sIncHeaders
+	 * @param string $aHeadersToRemove = array()
+	 *
+	 * @return string
+	 */
+	public static function RemoveHeaderFromHeaders($sIncHeaders, $aHeadersToRemove = array())
+	{
+		$sResultHeaders = $sIncHeaders;
+
+		if (\is_array($aHeadersToRemove) && 0 < \count($aHeadersToRemove))
+		{
+			$aHeadersToRemove = \array_map('strtolower', $aHeadersToRemove);
+
+			$sIncHeaders = \preg_replace('/[\r\n]+/', "\n", $sIncHeaders);
+			$aHeaders = \explode("\n", $sIncHeaders);
+
+			$bSkip = false;
+			$aResult = array();
+
+			foreach ($aHeaders as $sLine)
+			{
+				if (0 < \strlen($sLine))
+				{
+					$sFirst = $sLine{1};
+					if (' ' === $sFirst || "\t" === $sFirst)
+					{
+						if (!$bSkip)
+						{
+							$aResult[] = $sLine;
+						}
+					}
+					else
+					{
+						$bSkip = false;
+						$aParts = \explode(':', $sLine, 2);
+
+						if (!empty($aParts) && !empty($aParts[0]))
+						{
+							if (\in_array(\strtolower(\trim($aParts[0])), $aHeadersToRemove))
+							{
+								$bSkip = true;
+							}
+							else
+							{
+								$aResult[] = $sLine;
+							}
+						}
+					}
+				}
+			}
+
+			$sResultHeaders = \implode("\r\n", $aResult);
+		}
+
+		return $sResultHeaders;
 	}
 
 	/**
@@ -812,7 +930,7 @@ END;
 		$sResult = '';
 		if (0 < \strlen($sEmail))
 		{
-			$iPos = \strpos($sEmail, '@');
+			$iPos = \strrpos($sEmail, '@');
 			$sResult = (false === $iPos) ? $sEmail : \substr($sEmail, 0, $iPos);
 		}
 
@@ -829,7 +947,7 @@ END;
 		$sResult = '';
 		if (0 < \strlen($sEmail))
 		{
-			$iPos = \strpos($sEmail, '@');
+			$iPos = \strrpos($sEmail, '@');
 			if (false !== $iPos && 0 < $iPos)
 			{
 				$sResult = \substr($sEmail, $iPos + 1);
@@ -837,6 +955,20 @@ END;
 		}
 
 		return $sResult;
+	}
+
+	/**
+	 * @param string $sDomain
+	 *
+	 * @return string
+	 */
+	public static function GetClearDomainName($sDomain)
+	{
+		$sResultDomain = \preg_replace(
+			'/^(webmail|email|mail|www|imap4|pop3|imap|pop|demo|client|ssl|secure|test|cloud|box|m)\./i',
+				'', $sDomain);
+
+		return false === \strpos($sResultDomain, '.') ? $sDomain : $sResultDomain;
 	}
 
 	/**
@@ -1243,6 +1375,17 @@ END;
 	{
 		return \MailSo\Base\Utils::ClearNullBite(
 			\str_replace(array('"', '/', '\\', '*', '?', '<', '>', '|', ':'), ' ', $sValue));
+	}
+
+	/**
+	 * @param string $sValue
+	 *
+	 * @return string
+	 */
+	public static function Trim($sValue)
+	{
+		return \trim(\preg_replace('/^[\x00-\x1F]+/u', '',
+			\preg_replace('/[\x00-\x1F]+$/u', '', \trim($sValue))));
 	}
 
 	/**

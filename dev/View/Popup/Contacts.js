@@ -21,6 +21,8 @@
 		SettingsStore = require('Stores/User/Settings'),
 		ContactStore = require('Stores/User/Contact'),
 
+		Settings = require('Storage/Settings'),
+
 		Remote = require('Remote/User/Ajax'),
 
 		EmailModel = require('Model/Email'),
@@ -237,6 +239,12 @@
 		});
 
 		this.newMessageCommand = Utils.createCommand(this, function () {
+
+			if (!Settings.capa(Enums.Capa.Composer))
+			{
+				return false;
+			}
+
 			var
 				aE = [],
 				aC = this.contactsCheckedOrSelected(),
@@ -405,7 +413,7 @@
 	kn.extendAsViewModel(['View/Popup/Contacts', 'PopupsContactsViewModel'], ContactsPopupView);
 	_.extend(ContactsPopupView.prototype, AbstractView.prototype);
 
-	ContactsPopupView.prototype.getPropertyPlceholder = function (sType)
+	ContactsPopupView.prototype.getPropertyPlaceholder = function (sType)
 	{
 		var sResult = '';
 		switch (sType)
@@ -426,7 +434,7 @@
 
 	ContactsPopupView.prototype.addNewProperty = function (sType, sTypeStr)
 	{
-		this.viewProperties.push(new ContactPropertyModel(sType, sTypeStr || '', '', true, this.getPropertyPlceholder(sType)));
+		this.viewProperties.push(new ContactPropertyModel(sType, sTypeStr || '', '', true, this.getPropertyPlaceholder(sType)));
 	};
 
 	ContactsPopupView.prototype.addNewOrFocusProperty = function (sType, sTypeStr)
@@ -495,7 +503,6 @@
 					'name': 'uploader',
 					'queueSize': 1,
 					'multipleSizeLimit': 1,
-					'disableFolderDragAndDrop': true,
 					'disableDragAndDrop': true,
 					'disableMultiple': true,
 					'disableDocumentDropPrevent': true,
@@ -649,10 +656,10 @@
 		}
 
 		aList.unshift(new ContactPropertyModel(Enums.ContactPropertyType.LastName, '', sLastName, false,
-			this.getPropertyPlceholder(Enums.ContactPropertyType.LastName)));
+			this.getPropertyPlaceholder(Enums.ContactPropertyType.LastName)));
 
 		aList.unshift(new ContactPropertyModel(Enums.ContactPropertyType.FirstName, '', sFirstName, !oContact,
-			this.getPropertyPlceholder(Enums.ContactPropertyType.FirstName)));
+			this.getPropertyPlaceholder(Enums.ContactPropertyType.FirstName)));
 
 		this.viewID(sId);
 
@@ -773,7 +780,10 @@
 		{
 			this.bBackToCompose = false;
 
-			kn.showScreenPopup(require('View/Popup/Compose'));
+			if (Settings.capa(Enums.Capa.Composer))
+			{
+				kn.showScreenPopup(require('View/Popup/Compose'));
+			}
 		}
 	};
 
